@@ -1,11 +1,43 @@
-body {
-  font-family: Arial, sans-serif;
-  padding: 20px;
+/* =========================
+   Eurostile Font Definitions
+   ========================= */
+@font-face {
+  font-family: "Eurostile";
+  src: url("./fonts/Eurostile-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
 }
 
+@font-face {
+  font-family: "Eurostile";
+  src: url("./fonts/Eurostile-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* =========================
+   Global Styles
+   ========================= */
+body {
+  margin: 0;
+  padding: 20px;
+  background: linear-gradient(
+    to bottom,
+    #000000 0%,
+    #000000 75%,
+    #0b1a2a 100%
+  );
+  color: #ffffff;
+  font-family: "Eurostile", "Square 721", "Microgramma", "Bank Gothic", Arial, sans-serif;
+}
+
+/* =========================
+   Output Area
+   ========================= */
 #output {
   margin-top: 20px;
-  border: 1px solid #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   padding: 16px;
   min-height: 100px;
+  background: rgba(0, 0, 0, 0.6);
 }
