@@ -2,17 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Word–dB Test Machine</title>
-  <link rel="stylesheet" href="main.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Word → dB Translation Machine</title>
+  <link rel="stylesheet" href="./main.css" />
 </head>
+
 <body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <h1>Word → dB Translation Machine</h1>
+        <p class="sub">Prototype: generates timestamps + dB per word; dB drives typographic size.</p>
+      </div>
+      <div class="badge">30.00s</div>
+    </header>
 
-  <h1>Word → dB → Size (Test)</h1>
+    <section class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
 
-  <button id="runTest">Run Test</button>
+        <label class="label">Text</label>
+        <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
-  <div id="output"></div>
+        <div class="row row3">
+          <div class="field">
+            <label class="label">Duration (s)</label>
+            <input id="durationSec" class="input" type="number" value="30" min="1" step="1">
+          </div>
+          <div class="field">
+            <label class="label">Min dB</label>
+            <input id="minDb" class="input" type="number" value="-40" step="1">
+          </div>
+          <div class="field">
+            <label class="label">Max dB</label>
+            <input id="maxDb" class="input" type="number" value="-5" step="1">
+          </div>
+        </div>
 
-  <script src="app.js"></script>
+        <div class="row row2">
+          <div class="field">
+            <label class="label">Preset</label>
+            <select id="preset" class="input">
+              <option value="neutral">C-Neutral (balanced)</option>
+              <option value="peak">C-Peak (spiky)</option>
+              <option value="silence">C-Silence (more gaps)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Seed (repeatable)</label>
+            <input id="seed" class="input" type="number" value="12345" step="1">
+          </div>
+        </div>
+
+        <div class="row row3 actions">
+          <button id="generateBtn" class="btn primary">Generate</button>
+          <button id="downloadCsvBtn" class="btn">Download CSV</button>
+          <button id="newSeedBtn" class="btn ghost">New Seed</button>
+        </div>
+
+        <p id="status" class="status">Ready.</p>
+      </div>
+
+      <div class="card">
+        <h2>Output</h2>
+        <div id="wordOutput" class="output" aria-label="Generated typography output"></div>
+
+        <div class="timeline">
+          <input id="scrub" type="range" min="0" max="30" value="0" step="0.05">
+          <div class="timelineMeta">
+            <span id="scrubTime">0.00s</span>
+            <span id="scrubDb">— dB</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Generated Data</h2>
+      <div class="tableWrap">
+        <table id="metaTable" class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>word</th>
+              <th>start</th>
+              <th>end</th>
+              <th>dB</th>
+              <th>size(px)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="./app.js"></script>
 </body>
 </html>
