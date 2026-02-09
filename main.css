@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
+
 /* =========================
    Eurostile Font Definitions
    ========================= */
@@ -27,17 +29,85 @@ body {
     #000000 75%,
     #0b1a2a 100%
   );
-  color: #ffffff;
-  font-family: "Eurostile", "Square 721", "Microgramma", "Bank Gothic", Arial, sans-serif;
+  color: #b3e217;
+  font-family: 'Michroma', sans-serif;
 }
 
 /* =========================
-   Output Area
+   Title / Header
    ========================= */
-#output {
-  margin-top: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+.title {
+  margin: 0;
+  font-size: 64px;
+  font-weight: 700;      /* Eurostile Bold */
+  font-style: italic;   /* Synthetic italic (correct for Eurostile) */
+  letter-spacing: -.1em;
+  text-transform: uppercase;
+  color: #62d12b;
+}
+
+/* Optional subtitle under title */
+.sub {
+  font-family: "Eurostile", Arial, sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  color: #b3e217;
+}
+
+/* =========================
+   Output Display (White Box)
+   ========================= */
+.output {
+  border: 1px solid #000000;
+  background-color: #ffffff;   /* WHITE BACKGROUND */
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 200px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+/* Generated words inside output */
+.word {
+  font-family: Arial, Helvetica, sans-serif;  /* ← ARIAL */
+  color: #000000;
+}
+
+/* =========================
+   Input + Data = Monospace
+   ========================= */
+.textarea,
+.input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight: 400;
+  color: #b3e217;
+
+  background-color: #2a2a2a;          /* dark grey background */
+  border: 1px solid rgba(255,255,255,0.25);
+}
+.table,
+.status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight: 400;
+  color: #b3e217;
+}
+
+/* =========================
+   UI Elements
+   ========================= */
+.label,
+.btn {
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.04);
+  color: #b3e217;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.card {
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
   padding: 16px;
-  min-height: 100px;
-  background: rgba(0, 0, 0, 0.6);
 }
