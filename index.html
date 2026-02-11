@@ -27,7 +27,14 @@
           <input id="wavFileInput" type="file" accept="audio/*" class="input">
         </div>
 
-        <label class="label">Text</label>
+        <div class="field">
+          <label class="label">
+            <input type="checkbox" id="useTranscription">
+            Use transcription API (http://localhost:5000/transcribe)
+          </label>
+        </div>
+
+        <label class="label">Text (used if transcription is disabled)</label>
         <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
         <div class="field">

@@ -61,6 +61,26 @@ async function loadWavFile(file) {
   return { audioBuffer, sampleRate, duration };
 }
 
+// ---------- Transcription API Integration ----------
+let currentAudioFile = null; // Store the uploaded file for transcription
+
+async function uploadForTranscription(audioFile) {
+  const formData = new FormData();
+  formData.append('audio', audioFile);
+  
+  const response = await fetch('http://localhost:5000/transcribe', {
+    method: 'POST',
+    body: formData
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
+  }
+  
+  const data = await response.json();
+  return data; // Expected format: { words: [{word: string, start: number, end: number}] }
+}
+
 function getAudioAmplitudeAtTime(time) {
   if (!audioBuffer) return 0;
   
@@ -309,12 +329,12 @@ function getDbAtTime(t){
 }
 
 // ---------- Main Machine Runner ----------
-function runMachine(){
+async function runMachine(){
   const status = document.getElementById("status");
-  const text = document.getElementById("textInput").value;
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
   const mode = document.getElementById("mapMode").value;
+  const useTranscription = document.getElementById("useTranscription").checked;
 
   try {
     // === STEP 1: Validate audio loaded and duration = 30s ===
@@ -332,12 +352,6 @@ function runMachine(){
       status.textContent = `❌ Audio must be exactly 30s. Your file is ${durationSec.toFixed(2)}s.`;
       return;
     }
-
-    // === STEP 2: Validate text input ===
-    if (!text.trim()){
-      status.textContent = "❌ Please enter text.";
-      return;
-    }
     
     if (!(maxDb > minDb)){
       status.textContent = "❌ Max dB must be greater than Min dB.";
@@ -346,30 +360,67 @@ function runMachine(){
 
     durationGlobal = durationSec;
 
-    // === STEP 3: Decoding audio & measuring dB ===
+    let wordRows;
+    
+    // === STEP 2: Get word timestamps (either from API or manual input) ===
+    if (useTranscription) {
+      if (!currentAudioFile) {
+        status.textContent = "❌ Audio file not available for transcription.";
+        return;
+      }
+      
+      // Upload to transcription API
+      status.textContent = "🎙️ Uploading to transcription service...";
+      const transcriptionData = await uploadForTranscription(currentAudioFile);
+      
+      if (!transcriptionData || !transcriptionData.words || transcriptionData.words.length === 0) {
+        status.textContent = "❌ No words received from transcription service.";
+        return;
+      }
+      
+      // Use timestamps from API
+      wordRows = transcriptionData.words.map(w => ({
+        word: w.word,
+        start: w.start,
+        end: w.end
+      }));
+      
+      status.textContent = `✅ Received ${wordRows.length} words from transcription service.`;
+      
+    } else {
+      // Manual text input mode
+      const text = document.getElementById("textInput").value;
+      
+      if (!text.trim()){
+        status.textContent = "❌ Please enter text.";
+        return;
+      }
+      
+      // === STEP 4: Tokenize text input into words ===
+      status.textContent = "📝 Tokenizing text...";
+      const words = tokenize(text);
+      
+      if (words.length === 0) {
+        status.textContent = "❌ No words found in text.";
+        return;
+      }
+
+      // === STEP 5: Generate deterministic timestamps across 30s ===
+      status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
+      wordRows = makeTimestamps(words);
+      
+      if (!wordRows || wordRows.length === 0) {
+        status.textContent = "❌ Failed to generate timestamps.";
+        return;
+      }
+    }
+
+    // === STEP 3: Decoding audio & measuring dB (always in browser) ===
     status.textContent = "🎵 Measuring dB from audio...";
     dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
     
     if (!dbTimeline || dbTimeline.length === 0) {
       status.textContent = "❌ Failed to analyze audio.";
-      return;
-    }
-
-    // === STEP 4: Tokenize text input into words ===
-    status.textContent = "📝 Tokenizing text...";
-    const words = tokenize(text);
-    
-    if (words.length === 0) {
-      status.textContent = "❌ No words found in text.";
-      return;
-    }
-
-    // === STEP 5: Generate deterministic timestamps across 30s ===
-    status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
-    const wordRows = makeTimestamps(words);
-    
-    if (!wordRows || wordRows.length === 0) {
-      status.textContent = "❌ Failed to generate timestamps.";
       return;
     }
     
@@ -394,7 +445,8 @@ function runMachine(){
 
     document.getElementById("durationSec").value = durationSec.toFixed(2);
 
-    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode}`;
+    const source = useTranscription ? 'API transcription' : 'manual text';
+    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode} • Source: ${source}`;
     
   } catch (error) {
     status.textContent = `❌ Error: ${error.message}`;
@@ -420,12 +472,14 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
     if (Math.abs(duration - 30) > 0.1) {
       status.textContent = `Error: Audio must be exactly 30 seconds. Your file is ${duration.toFixed(2)}s.`;
       audioBuffer = null; // Clear invalid buffer
+      currentAudioFile = null;
       document.getElementById("durationSec").value = "0";
       e.target.value = ""; // Clear file input
       return;
     }
     
     audioBuffer = buffer;
+    currentAudioFile = file; // Store for transcription API
     document.getElementById("durationSec").value = duration.toFixed(2);
     status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${sampleRate}Hz). Click Generate.`;
   } catch (error) {
