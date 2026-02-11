@@ -77,17 +77,18 @@ function getDbAtWordTime(startTime, endTime) {
   return amplitudeToDb(maxAmplitude);
 }
 
-// ---------- Distribute words evenly across duration ----------
-function makeTimestamps(words, durationSec) {
+// ---------- Deterministic word timestamps across exactly 30.0s ----------
+function makeTimestamps(words) {
   const n = words.length;
   if (n === 0) return [];
 
-  const wordDuration = durationSec / n;
+  const DURATION = 30.0;
+  const wordDur = DURATION / n;
   const rows = [];
   
   for (let i = 0; i < n; i++) {
-    const start = i * wordDuration;
-    const end = (i + 1) * wordDuration;
+    const start = i * wordDur;
+    const end = (i + 1) * wordDur;
     rows.push({ word: words[i], start, end });
   }
   
@@ -245,7 +246,7 @@ function generate(){
   }
 
   const words = tokenize(text);
-  const tRows = makeTimestamps(words, durationSec);
+  const tRows = makeTimestamps(words);
   const rows = makeDbPerWord(tRows, minDb, maxDb);
 
   currentRows = rows;
