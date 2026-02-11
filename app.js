@@ -118,6 +118,32 @@ function makeTimestamps(words) {
   
   return rows;
 }
+
+// ---------- Assign dB values from timeline to words ----------
+function assignDbToWords(wordRows, dbTimeline) {
+  return wordRows.map(row => {
+    const { start, end } = row;
+    
+    // Find all samples within this word's time range
+    const samplesInRange = dbTimeline.filter(sample => 
+      sample.t >= start && sample.t <= end
+    );
+    
+    if (samplesInRange.length === 0) {
+      // No samples found, use a default
+      return { ...row, db: -40, dbMean: -40, dbMax: -40 };
+    }
+    
+    // Calculate dbMean (average)
+    const dbSum = samplesInRange.reduce((sum, s) => sum + s.db, 0);
+    const dbMean = dbSum / samplesInRange.length;
+    
+    // Calculate dbMax
+    const dbMax = Math.max(...samplesInRange.map(s => s.db));
+    
+    // Set db = dbMean for font size mapping
+    return { ...row, db: dbMean, dbMean, dbMax };
+  });
 }
 
 // ---------- Calculate dB from audio for each word ----------
@@ -167,7 +193,9 @@ function renderWords(rows, minDb, maxDb) {
     span.style.lineHeight = "1.05";
 
     // Hover tooltip
-    span.title = `#${idx+1}\n${r.start.toFixed(2)}–${r.end.toFixed(2)}s\n${r.db.toFixed(1)} dB\n${size}px`;
+    const dbMeanStr = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
+    const dbMaxStr = r.dbMax !== undefined ? ` | Max: ${r.dbMax.toFixed(1)}` : '';
+    span.title = `#${idx+1}\n${r.start.toFixed(2)}–${r.end.toFixed(2)}s\nMean: ${dbMeanStr} dB${dbMaxStr}\n${size}px`;
 
     container.appendChild(span);
     container.appendChild(document.createTextNode(" "));
@@ -180,13 +208,16 @@ function renderTable(rows, minDb, maxDb) {
 
   rows.forEach((r, i) => {
     const size = dbToFontPx(r.db, minDb, maxDb);
+    const dbMean = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
+    const dbMax = r.dbMax !== undefined ? r.dbMax.toFixed(1) : '—';
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td>${escapeHtml(r.word)}</td>
       <td>${r.start.toFixed(2)}</td>
       <td>${r.end.toFixed(2)}</td>
-      <td>${r.db.toFixed(1)}</td>
+      <td>${dbMean}</td>
+      <td>${dbMax}</td>
       <td>${size}</td>
     `;
     tbody.appendChild(tr);
@@ -204,13 +235,15 @@ function escapeHtml(str){
 
 // ---------- CSV Download ----------
 function rowsToCsv(rows, minDb, maxDb) {
-  const header = ["index","word","start","end","db","font_px"];
+  const header = ["index","word","start","end","dbMean","dbMax","font_px"];
   const lines = [header.join(",")];
 
   rows.forEach((r, i) => {
     const size = dbToFontPx(r.db, minDb, maxDb);
     const safeWord = `"${String(r.word).replaceAll('"','""')}"`;
-    lines.push([i+1, safeWord, r.start.toFixed(2), r.end.toFixed(2), r.db.toFixed(1), size].join(","));
+    const dbMean = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
+    const dbMax = r.dbMax !== undefined ? r.dbMax.toFixed(1) : r.db.toFixed(1);
+    lines.push([i+1, safeWord, r.start.toFixed(2), r.end.toFixed(2), dbMean, dbMax, size].join(","));
   });
 
   return lines.join("\n");
