@@ -493,9 +493,9 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
   try {
     const { audioBuffer: buffer, sampleRate, duration } = await loadWavFile(file);
     
-    // Validate: must be 30 seconds or less
-    if (duration > 30) {
-      status.textContent = `Error: Audio must be 30 seconds or less. Your file is ${duration.toFixed(2)}s.`;
+    // Validate: must be 5 minutes or less
+    if (duration > 300) {
+      status.textContent = `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`;
       audioBuffer = null; // Clear invalid buffer
       currentAudioFile = null;
       document.getElementById("durationSec").value = "0";
