@@ -31,7 +31,12 @@ async function loadWavFile(file) {
 
   const arrayBuffer = await file.arrayBuffer();
   audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  return audioBuffer;
+  
+  // Store sampleRate and duration
+  const sampleRate = audioBuffer.sampleRate;
+  const duration = audioBuffer.duration;
+  
+  return { audioBuffer, sampleRate, duration };
 }
 
 function getAudioAmplitudeAtTime(time) {
@@ -264,16 +269,28 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
   
   const status = document.getElementById("status");
   status.classList.remove("flashing");
-  status.textContent = "Loading WAV file...";
+  status.textContent = "Loading audio file...";
   
   try {
-    await loadWavFile(file);
-    const duration = audioBuffer.duration;
+    const { audioBuffer: buffer, sampleRate, duration } = await loadWavFile(file);
+    
+    // Validate: must be exactly 30 seconds (allow 0.1s tolerance)
+    if (Math.abs(duration - 30) > 0.1) {
+      status.textContent = `Error: Audio must be exactly 30 seconds. Your file is ${duration.toFixed(2)}s.`;
+      audioBuffer = null; // Clear invalid buffer
+      document.getElementById("durationSec").value = "0";
+      e.target.value = ""; // Clear file input
+      return;
+    }
+    
+    audioBuffer = buffer;
     document.getElementById("durationSec").value = duration.toFixed(2);
-    status.textContent = `WAV file loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate.`;
+    status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${sampleRate}Hz). Click Generate.`;
   } catch (error) {
-    status.textContent = `Error loading WAV file: ${error.message}`;
+    status.textContent = `Error loading audio file: ${error.message}`;
     console.error(error);
+    audioBuffer = null;
+    e.target.value = "";
   }
 });
 
