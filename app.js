@@ -1,21 +1,12 @@
 // =============================
-// Word → dB Translation Machine (Mock Data Prototype)
+// Word → dB Translation Machine (WAV File Input)
 // =============================
 
 let currentRows = [];
 let dbTimeline = []; // sampled timeline for scrub preview
 let durationGlobal = 30;
-
-// ---------- Seeded RNG (repeatable) ----------
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function() {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+let audioBuffer = null;
+let audioContext = null;
 
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t){ return a + (b - a) * t; }
@@ -32,94 +23,78 @@ function tokenize(text) {
   return (text || "").trim().split(/\s+/).filter(Boolean);
 }
 
-// ---------- Presets ----------
-function getPreset(presetName){
-  // knobs: pauseChance, pauseMin, pauseMax, dbSmooth, spikeChance, spikeStrength
-  // plus a general "density" affect by word duration jitter.
-  const presets = {
-    neutral: {
-      pauseChance: 0.12,
-      pauseMin: 0.15,
-      pauseMax: 0.55,
-      durJitter: 0.35,
-      dbSmooth: 0.70,
-      spikeChance: 0.08,
-      spikeStrength: 0.75
-    },
-    peak: {
-      pauseChance: 0.08,
-      pauseMin: 0.10,
-      pauseMax: 0.35,
-      durJitter: 0.45,
-      dbSmooth: 0.55,
-      spikeChance: 0.18,
-      spikeStrength: 1.00
-    },
-    silence: {
-      pauseChance: 0.22,
-      pauseMin: 0.30,
-      pauseMax: 0.95,
-      durJitter: 0.25,
-      dbSmooth: 0.78,
-      spikeChance: 0.05,
-      spikeStrength: 0.55
-    }
-  };
-  return presets[presetName] || presets.neutral;
+// ---------- WAV File Processing ----------
+async function loadWavFile(file) {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  return audioBuffer;
 }
 
-// ---------- Mock timestamps across fixed duration ----------
-function makeTimestamps(words, durationSec, rng, preset) {
+function getAudioAmplitudeAtTime(time) {
+  if (!audioBuffer) return 0;
+  
+  const sampleRate = audioBuffer.sampleRate;
+  const sampleIndex = Math.floor(time * sampleRate);
+  
+  if (sampleIndex >= audioBuffer.length) return 0;
+  
+  // Get amplitude from all channels (average)
+  let sum = 0;
+  for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+    const channelData = audioBuffer.getChannelData(channel);
+    sum += Math.abs(channelData[sampleIndex] || 0);
+  }
+  
+  return sum / audioBuffer.numberOfChannels;
+}
+
+function amplitudeToDb(amplitude) {
+  if (amplitude <= 0) return -80;
+  return 20 * Math.log10(amplitude);
+}
+
+function getDbAtWordTime(startTime, endTime) {
+  if (!audioBuffer) return -40;
+  
+  const sampleCount = 10; // Sample 10 points within the word timeframe
+  let maxAmplitude = 0;
+  
+  for (let i = 0; i < sampleCount; i++) {
+    const t = startTime + (endTime - startTime) * (i / sampleCount);
+    const amp = getAudioAmplitudeAtTime(t);
+    maxAmplitude = Math.max(maxAmplitude, amp);
+  }
+  
+  return amplitudeToDb(maxAmplitude);
+}
+
+// ---------- Distribute words evenly across duration ----------
+function makeTimestamps(words, durationSec) {
   const n = words.length;
   if (n === 0) return [];
 
-  const base = durationSec / n;
-  let t = 0;
-
+  const wordDuration = durationSec / n;
   const rows = [];
-  for (let i = 0; i < n; i++){
-    const jitter = (rng() - 0.5) * base * preset.durJitter;
-    const dur = Math.max(0.12, base + jitter);
-
-    const addPause = rng() < preset.pauseChance;
-    const pause = addPause ? lerp(preset.pauseMin, preset.pauseMax, rng()) : 0;
-
-    const start = t;
-    const end = Math.min(durationSec, t + dur);
-    t = end + pause;
-
+  
+  for (let i = 0; i < n; i++) {
+    const start = i * wordDuration;
+    const end = (i + 1) * wordDuration;
     rows.push({ word: words[i], start, end });
-    if (t >= durationSec) break;
   }
-
-  // Ensure last word ends at duration
-  if (rows.length > 0) rows[rows.length - 1].end = durationSec;
-
-  // Fix any reversed windows
-  for (const r of rows){
-    if (r.end < r.start) r.end = r.start;
-  }
+  
   return rows;
 }
 
-// ---------- Mock dB per word ----------
-function makeDbPerWord(rows, minDb, maxDb, rng, preset) {
-  let prev = lerp(minDb, maxDb, 0.45);
-
+// ---------- Calculate dB from audio for each word ----------
+function makeDbPerWord(rows, minDb, maxDb) {
   return rows.map(r => {
-    // base target + smoothing (feels like speech)
-    const target = lerp(minDb, maxDb, rng());
-    let db = clamp(prev * preset.dbSmooth + target * (1 - preset.dbSmooth), minDb, maxDb);
-
-    // occasional spikes (Peak preset exaggerates)
-    if (rng() < preset.spikeChance){
-      const spike = lerp(0.25, 1.0, rng()) * preset.spikeStrength; // 0..1
-      const spikeDb = lerp(db, maxDb, spike);
-      db = clamp(spikeDb, minDb, maxDb);
-    }
-
-    prev = db;
-    return { ...r, db };
+    const db = getDbAtWordTime(r.start, r.end);
+    const clampedDb = clamp(db, minDb, maxDb);
+    return { ...r, db: clampedDb };
   });
 }
 
@@ -244,12 +219,15 @@ function generate(){
   const status = document.getElementById("status");
   const text = document.getElementById("textInput").value;
 
-  const durationSec = Number(document.getElementById("durationSec").value);
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
-  const presetName = document.getElementById("preset").value;
-  const seed = Number(document.getElementById("seed").value) || 0;
 
+  if (!audioBuffer) {
+    status.textContent = "Please upload a WAV file first.";
+    return;
+  }
+
+  const durationSec = audioBuffer.duration;
   durationGlobal = durationSec;
 
   if (!text.trim()){
@@ -260,17 +238,10 @@ function generate(){
     status.textContent = "Max dB must be greater than Min dB.";
     return;
   }
-  if (durationSec <= 0){
-    status.textContent = "Duration must be > 0.";
-    return;
-  }
-
-  const preset = getPreset(presetName);
-  const rng = mulberry32(seed);
 
   const words = tokenize(text);
-  const tRows = makeTimestamps(words, durationSec, rng, preset);
-  const rows = makeDbPerWord(tRows, minDb, maxDb, rng, preset);
+  const tRows = makeTimestamps(words, durationSec);
+  const rows = makeDbPerWord(tRows, minDb, maxDb);
 
   currentRows = rows;
   dbTimeline = buildDbTimeline(rows, durationSec, minDb, maxDb);
@@ -279,16 +250,30 @@ function generate(){
   renderTable(rows, minDb, maxDb);
   setScrubUI(durationSec);
 
-  status.textContent = `Generated ${rows.length} words • Preset: ${presetName} • Seed: ${seed}`;
+  document.getElementById("durationSec").value = durationSec.toFixed(2);
+
+  status.textContent = `Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s from WAV file`;
 }
 
 // ---------- Wire up events ----------
 document.getElementById("generateBtn").addEventListener("click", generate);
 
-document.getElementById("newSeedBtn").addEventListener("click", () => {
-  const newSeed = Math.floor(Math.random() * 1e9);
-  document.getElementById("seed").value = String(newSeed);
-  document.getElementById("status").textContent = `Seed set to ${newSeed}. Click Generate.`;
+document.getElementById("wavFileInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const status = document.getElementById("status");
+  status.textContent = "Loading WAV file...";
+  
+  try {
+    await loadWavFile(file);
+    const duration = audioBuffer.duration;
+    document.getElementById("durationSec").value = duration.toFixed(2);
+    status.textContent = `WAV file loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate.`;
+  } catch (error) {
+    status.textContent = `Error loading WAV file: ${error.message}`;
+    console.error(error);
+  }
 });
 
 document.getElementById("downloadCsvBtn").addEventListener("click", () => {
@@ -315,5 +300,5 @@ document.getElementById("scrub").addEventListener("input", (e) => {
   }
 });
 
-// Auto-generate once on load
-generate();
+// Ready to load WAV file
+document.getElementById("status").textContent = "Upload a WAV file to begin.";

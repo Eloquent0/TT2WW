@@ -13,7 +13,7 @@
       <div>
         <h1><h1 class="title">TT2WW</h1>
 <p class="sub">Word → dB Translation Machine</p></h1>
-        <p class="sub">Prototype: generates timestamps + dB per word; dB drives typographic size.</p>
+        <p class="sub">Upload a WAV file to analyze audio amplitude and drive typographic size per word.</p>
       </div>
       <div class="badge">30.00s</div>
     </header>
@@ -25,10 +25,15 @@
         <label class="label">Text</label>
         <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
+        <div class="field">
+          <label class="label">Upload WAV File</label>
+          <input id="wavFileInput" type="file" accept=".wav,audio/wav" class="input">
+        </div>
+
         <div class="row row3">
           <div class="field">
-            <label class="label">Duration (s)</label>
-            <input id="durationSec" class="input" type="number" value="30" min="1" step="1">
+            <label class="label">Duration (s) - from WAV</label>
+            <input id="durationSec" class="input" type="number" value="0" readonly>
           </div>
           <div class="field">
             <label class="label">Min dB</label>
@@ -40,28 +45,12 @@
           </div>
         </div>
 
-        <div class="row row2">
-          <div class="field">
-            <label class="label">Preset</label>
-            <select id="preset" class="input">
-              <option value="neutral">C-Neutral (balanced)</option>
-              <option value="peak">C-Peak (spiky)</option>
-              <option value="silence">C-Silence (more gaps)</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="label">Seed (repeatable)</label>
-            <input id="seed" class="input" type="number" value="12345" step="1">
-          </div>
-        </div>
-
         <div class="row row3 actions">
           <button id="generateBtn" class="btn primary">Generate</button>
           <button id="downloadCsvBtn" class="btn">Download CSV</button>
-          <button id="newSeedBtn" class="btn ghost">New Seed</button>
         </div>
 
-        <p id="status" class="status">Ready.</p>
+        <p id="status" class="status">Upload a WAV file to begin.</p>
       </div>
 
       <div class="card">
