@@ -228,6 +228,24 @@ function buildDbTimeline(durationSec, minDb, maxDb) {
   return samples;
 }
 
+// ---------- dB to Color mapping (blue=quiet, red=loud) ----------
+function dbToColor(db, minDb, maxDb) {
+  if (maxDb === minDb) return 'rgb(100, 100, 255)'; // default blue
+  
+  // Normalize to 0-1
+  let t = (db - minDb) / (maxDb - minDb);
+  t = clamp(t, 0, 1);
+  
+  // Interpolate from blue (quiet) to red (loud)
+  // Blue: rgb(100, 150, 255)
+  // Red: rgb(255, 80, 80)
+  const r = Math.round(100 + (155 * t));
+  const g = Math.round(150 - (70 * t));
+  const b = Math.round(255 - (175 * t));
+  
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 // ---------- Render ----------
 function renderWords(rows, minDb, maxDb, mode = 'neutral') {
   const container = document.getElementById("wordOutput");
@@ -235,12 +253,14 @@ function renderWords(rows, minDb, maxDb, mode = 'neutral') {
 
   rows.forEach((r, idx) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
+    const color = dbToColor(r.db, minDb, maxDb);
     const span = document.createElement("span");
     span.className = "word";
     span.textContent = r.word;
 
     span.style.fontSize = `${size}px`;
     span.style.lineHeight = "1.05";
+    span.style.color = color;
 
     // Hover tooltip
     const dbMeanStr = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);

@@ -1,7 +1,7 @@
 :root{
   --bg:#0b0f17;
   --card:#0f1623;
-  --muted:#9aa7bd;
+  --muted:#9aa7bZd;
   --text:#e7eefc;
   --line:#233046;
   --accent:#7aa7ff;
@@ -167,6 +167,48 @@ h1{
 .word:hover{
   outline: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.04);
+}
+
+.legend{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.legend-label{
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.legend-gradient{
+  flex: 1;
+  height: 20px;
+  border-radius: 4px;
+  background: linear-gradient(to right, 
+    rgb(100, 150, 255), 
+    rgb(180, 110, 180),
+    rgb(255, 80, 80)
+  );
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.legend-labels{
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.legend-labels span{
+  white-space: nowrap;
 }
 
 .timeline{
