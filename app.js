@@ -346,10 +346,15 @@ async function runMachine(){
     }
 
     const durationSec = audioBuffer.duration;
-    const REQUIRED_DURATION = 30.0;
+    const MAX_DURATION = 30.0;
     
-    if (Math.abs(durationSec - REQUIRED_DURATION) > 0.1) {
-      status.textContent = `❌ Audio must be exactly 30s. Your file is ${durationSec.toFixed(2)}s.`;
+    if (durationSec > MAX_DURATION) {
+      status.textContent = `❌ Audio must be 30s or less. Your file is ${durationSec.toFixed(2)}s.`;
+      return;
+    }
+    
+    if (durationSec <= 0) {
+      status.textContent = `❌ Invalid audio duration.`;
       return;
     }
     
@@ -468,13 +473,22 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
   try {
     const { audioBuffer: buffer, sampleRate, duration } = await loadWavFile(file);
     
-    // Validate: must be exactly 30 seconds (allow 0.1s tolerance)
-    if (Math.abs(duration - 30) > 0.1) {
-      status.textContent = `Error: Audio must be exactly 30 seconds. Your file is ${duration.toFixed(2)}s.`;
+    // Validate: must be 30 seconds or less
+    if (duration > 30) {
+      status.textContent = `Error: Audio must be 30 seconds or less. Your file is ${duration.toFixed(2)}s.`;
       audioBuffer = null; // Clear invalid buffer
       currentAudioFile = null;
       document.getElementById("durationSec").value = "0";
       e.target.value = ""; // Clear file input
+      return;
+    }
+    
+    if (duration <= 0) {
+      status.textContent = `Error: Invalid audio duration.`;
+      audioBuffer = null;
+      currentAudioFile = null;
+      document.getElementById("durationSec").value = "0";
+      e.target.value = "";
       return;
     }
     
