@@ -4,7 +4,7 @@
 
 let currentRows = [];
 let dbTimeline = []; // sampled timeline for scrub preview
-let durationGlobal = 30;
+let durationGlobal = 300;
 let audioBuffer = null;
 let audioContext = null;
 
@@ -124,7 +124,7 @@ function makeTimestamps(words) {
   const n = words.length;
   if (n === 0) return [];
 
-  const DURATION = 30.0;
+  const DURATION = 300.0;
   const PAUSE_DURATION = 0.15; // seconds per punctuation pause
   const PUNCTUATION = /[.,!?;:]$/; // detect trailing punctuation
   
@@ -357,7 +357,7 @@ async function runMachine(){
   const useTranscription = document.getElementById("useTranscription").checked;
 
   try {
-    // === STEP 1: Validate audio loaded and duration = 30s ===
+    // === STEP 1: Validate audio loaded and duration ≤ 5 minutes ===
     status.textContent = "🔍 Validating audio...";
     
     if (!audioBuffer) {
@@ -366,10 +366,10 @@ async function runMachine(){
     }
 
     const durationSec = audioBuffer.duration;
-    const MAX_DURATION = 30.0;
-    
+    const MAX_DURATION = 300.0;
+
     if (durationSec > MAX_DURATION) {
-      status.textContent = `❌ Audio must be 30s or less. Your file is ${durationSec.toFixed(2)}s.`;
+      status.textContent = `❌ Audio must be 5 minutes or less. Your file is ${durationSec.toFixed(2)}s.`;
       return;
     }
     

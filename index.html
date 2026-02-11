@@ -15,7 +15,7 @@
 <p class="sub">Word → dB Translation Machine</p></h1>
         <p class="sub">Upload a WAV file to analyze audio amplitude and drive typographic size per word.</p>
       </div>
-      <div class="badge">30.00s</div>
+      <div class="badge">5:00</div>
     </header>
 
     <section class="grid">
@@ -23,7 +23,7 @@
         <h2>Inputs</h2>
 
         <div class="field">
-          <label class="label">Upload Audio/Video File (30 seconds or less)</label>
+          <label class="label">Upload Audio/Video File (5 minutes or less)</label>
           <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*" class="input">
         </div>
 
@@ -84,7 +84,7 @@
         </div>
 
         <div class="timeline">
-          <input id="scrub" type="range" min="0" max="30" value="0" step="0.05">
+          <input id="scrub" type="range" min="0" max="300" value="0" step="0.05">
           <div class="timelineMeta">
             <span id="scrubTime">0.00s</span>
             <span id="scrubDb">— dB</span>
