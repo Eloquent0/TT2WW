@@ -77,22 +77,47 @@ function getDbAtWordTime(startTime, endTime) {
   return amplitudeToDb(maxAmplitude);
 }
 
-// ---------- Deterministic word timestamps across exactly 30.0s ----------
+// ---------- Deterministic word timestamps with punctuation pauses ----------
 function makeTimestamps(words) {
   const n = words.length;
   if (n === 0) return [];
 
   const DURATION = 30.0;
-  const wordDur = DURATION / n;
+  const PAUSE_DURATION = 0.15; // seconds per punctuation pause
+  const PUNCTUATION = /[.,!?;:]$/; // detect trailing punctuation
+  
+  // Count words with punctuation
+  let pauseCount = 0;
+  for (const word of words) {
+    if (PUNCTUATION.test(word)) pauseCount++;
+  }
+  
+  // Calculate time allocation
+  const totalPauseTime = pauseCount * PAUSE_DURATION;
+  const totalWordTime = DURATION - totalPauseTime;
+  const wordDur = totalWordTime / n;
+  
+  // Build timestamps with pauses
   const rows = [];
+  let currentTime = 0;
   
   for (let i = 0; i < n; i++) {
-    const start = i * wordDur;
-    const end = (i + 1) * wordDur;
-    rows.push({ word: words[i], start, end });
+    const word = words[i];
+    const start = currentTime;
+    const end = currentTime + wordDur;
+    
+    rows.push({ word, start, end });
+    
+    currentTime = end;
+    
+    // Add pause after punctuation
+    if (PUNCTUATION.test(word)) {
+      currentTime += PAUSE_DURATION;
+    }
   }
   
   return rows;
+}
 }
 
 // ---------- Calculate dB from audio for each word ----------
