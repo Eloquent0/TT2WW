@@ -297,6 +297,9 @@ function dbToColor(db, minDb, maxDb) {
   let t = (db - minDb) / (maxDb - minDb);
   t = clamp(t, 0, 1);
   
+  // Apply exponential curve to make it more sensitive (emphasize louder sounds)
+  t = Math.pow(t, 0.6); // Makes transition faster toward red
+  
   // Interpolate from blue (quiet) to red (loud)
   // Blue: rgb(100, 150, 255)
   // Red: rgb(255, 80, 80)
