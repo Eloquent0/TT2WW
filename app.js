@@ -119,6 +119,67 @@ function getDbAtWordTime(startTime, endTime) {
   return amplitudeToDb(maxAmplitude);
 }
 
+// ---------- Parse timestamped text format (time\nword\ntime\nword) ----------
+function parseTimestampedText(text) {
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  const result = [];
+  
+  for (let i = 0; i < lines.length - 1; i += 2) {
+    const timeLine = lines[i];
+    const textLine = lines[i + 1];
+    
+    // Parse timestamp (format: "M:SS" or "MM:SS" or "H:MM:SS")
+    const timeMatch = timeLine.match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
+    if (!timeMatch) continue;
+    
+    const minutes = parseInt(timeMatch[1], 10);
+    const seconds = parseInt(timeMatch[2], 10);
+    const hours = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+    const startTime = hours * 3600 + minutes * 60 + seconds;
+    
+    // Split text into words
+    const words = textLine.trim().split(/\s+/).filter(Boolean);
+    
+    // Store each word with its timestamp segment
+    result.push({
+      time: startTime,
+      text: textLine,
+      words: words
+    });
+  }
+  
+  return result;
+}
+
+// ---------- Convert parsed timestamps to word rows with time windows ----------
+function timestampsToWordRows(timestampedSegments) {
+  const wordRows = [];
+  
+  for (let i = 0; i < timestampedSegments.length; i++) {
+    const segment = timestampedSegments[i];
+    const nextSegment = timestampedSegments[i + 1];
+    
+    const segmentStart = segment.time;
+    const segmentEnd = nextSegment ? nextSegment.time : segmentStart + 2.0; // default 2s if last segment
+    const segmentDuration = segmentEnd - segmentStart;
+    const wordCount = segment.words.length;
+    
+    if (wordCount === 0) continue;
+    
+    const wordDuration = segmentDuration / wordCount;
+    
+    for (let j = 0; j < segment.words.length; j++) {
+      const word = segment.words[j];
+      const start = segmentStart + (j * wordDuration);
+      const end = start + wordDuration;
+      
+      wordRows.push({ word, start, end });
+    }
+  }
+  
+  return wordRows;
+}
+
 // ---------- Deterministic word timestamps with punctuation pauses ----------
 function makeTimestamps(words) {
   const n = words.length;
@@ -421,18 +482,42 @@ async function runMachine(){
         return;
       }
       
-      // === STEP 4: Tokenize text input into words ===
-      status.textContent = "📝 Tokenizing text...";
-      const words = tokenize(text);
+      // Check if text contains timestamps (detect pattern like "0:01")
+      const hasTimestamps = /^\d+:\d{2}/m.test(text);
       
-      if (words.length === 0) {
-        status.textContent = "❌ No words found in text.";
-        return;
-      }
+      if (hasTimestamps) {
+        // === STEP 4a: Parse timestamped text ===
+        status.textContent = "📝 Parsing timestamped text...";
+        const timestampedSegments = parseTimestampedText(text);
+        
+        if (timestampedSegments.length === 0) {
+          status.textContent = "❌ No valid timestamps found.";
+          return;
+        }
+        
+        // Convert to word rows
+        wordRows = timestampsToWordRows(timestampedSegments);
+        
+        if (wordRows.length === 0) {
+          status.textContent = "❌ No words found in timestamped text.";
+          return;
+        }
+        
+        status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
+      } else {
+        // === STEP 4b: Tokenize plain text ===
+        status.textContent = "📝 Tokenizing text...";
+        const words = tokenize(text);
+        
+        if (words.length === 0) {
+          status.textContent = "❌ No words found in text.";
+          return;
+        }
 
-      // === STEP 5: Generate deterministic timestamps across 30s ===
-      status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
-      wordRows = makeTimestamps(words);
+        // === STEP 5: Generate deterministic timestamps across duration ===
+        status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
+        wordRows = makeTimestamps(words);
+      }
       
       if (!wordRows || wordRows.length === 0) {
         status.textContent = "❌ Failed to generate timestamps.";
