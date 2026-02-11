@@ -147,6 +147,7 @@ h1{
 }
 
 .output{
+  position: relative;
   border: 1px dashed rgba(122,167,255,0.35);
   background: rgba(0,0,0,0.18);
   border-radius: 12px;
@@ -154,6 +155,11 @@ h1{
   min-height: 200px;
   line-height: 1.15;
   overflow-wrap:anywhere;
+}
+
+.output:hover .legend{
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .word {
@@ -170,14 +176,21 @@ h1{
 }
 
 .legend{
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
   padding: 10px;
-  background: rgba(0,0,0,0.15);
+  background: rgba(11,15,23,0.95);
   border-radius: 8px;
   border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+  z-index: 10;
 }
 
 .legend-label{
