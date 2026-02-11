@@ -30,6 +30,15 @@
         <label class="label">Text</label>
         <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
+        <div class="field">
+          <label class="label">Mapping Mode (affects dB→size curve only)</label>
+          <select id="mapMode" class="input">
+            <option value="neutral">Neutral (linear)</option>
+            <option value="peak">Peak (emphasize loud)</option>
+            <option value="silence">Silence (emphasize quiet)</option>
+          </select>
+        </div>
+
         <div class="row row3">
           <div class="field">
             <label class="label">Duration (s) - from WAV</label>

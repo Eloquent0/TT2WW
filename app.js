@@ -11,11 +11,33 @@ let audioContext = null;
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t){ return a + (b - a) * t; }
 
-// dB → font size mapping
-function dbToFontPx(db, minDb, maxDb, minPx = 14, maxPx = 120) {
+// dB → font size mapping with different curve modes
+function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120) {
   if (maxDb === minDb) return minPx;
-  const t = (db - minDb) / (maxDb - minDb);
-  return Math.round(lerp(minPx, maxPx, clamp(t, 0, 1)));
+  
+  // Normalize dB to 0-1 range
+  let t = (db - minDb) / (maxDb - minDb);
+  t = clamp(t, 0, 1);
+  
+  // Apply curve based on mode
+  switch(mode) {
+    case 'peak':
+      // Exponential: emphasize louder sounds (t^2.5)
+      t = Math.pow(t, 2.5);
+      break;
+      
+    case 'silence':
+      // Compress highs, expand lows: emphasize quiet sounds (sqrt)
+      t = Math.pow(t, 0.4);
+      break;
+      
+    case 'neutral':
+    default:
+      // Linear: keep t as is
+      break;
+  }
+  
+  return Math.round(lerp(minPx, maxPx, t));
 }
 
 // Tokenize text into words
@@ -120,7 +142,9 @@ function makeTimestamps(words) {
 }
 
 // ---------- Assign dB values from timeline to words ----------
-function assignDbToWords(wordRows, dbTimeline) {
+function assignDbToWords(wordRows, dbTimeline, minDb = -40, maxDb = -5) {
+  const SILENCE_FLOOR = -60;
+  
   return wordRows.map(row => {
     const { start, end } = row;
     
@@ -129,48 +153,54 @@ function assignDbToWords(wordRows, dbTimeline) {
       sample.t >= start && sample.t <= end
     );
     
+    // If no samples found, use silence floor
     if (samplesInRange.length === 0) {
-      // No samples found, use a default
-      return { ...row, db: -40, dbMean: -40, dbMax: -40 };
+      const clampedSilence = clamp(SILENCE_FLOOR, minDb, maxDb);
+      return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence };
+    }
+    
+    // Filter out NaN and invalid values
+    const validSamples = samplesInRange.filter(s => 
+      Number.isFinite(s.db) && !Number.isNaN(s.db)
+    );
+    
+    // If all samples are invalid, use silence floor
+    if (validSamples.length === 0) {
+      const clampedSilence = clamp(SILENCE_FLOOR, minDb, maxDb);
+      return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence };
     }
     
     // Calculate dbMean (average)
-    const dbSum = samplesInRange.reduce((sum, s) => sum + s.db, 0);
-    const dbMean = dbSum / samplesInRange.length;
+    const dbSum = validSamples.reduce((sum, s) => sum + s.db, 0);
+    const dbMean = dbSum / validSamples.length;
     
     // Calculate dbMax
-    const dbMax = Math.max(...samplesInRange.map(s => s.db));
+    const dbMax = Math.max(...validSamples.map(s => s.db));
+    
+    // Clamp values to the styling range
+    const clampedMean = clamp(dbMean, minDb, maxDb);
+    const clampedMax = clamp(dbMax, minDb, maxDb);
     
     // Set db = dbMean for font size mapping
-    return { ...row, db: dbMean, dbMean, dbMax };
+    return { ...row, db: clampedMean, dbMean: clampedMean, dbMax: clampedMax };
   });
 }
 
-// ---------- Calculate dB from audio for each word ----------
-function makeDbPerWord(rows, minDb, maxDb) {
-  return rows.map(r => {
-    const db = getDbAtWordTime(r.start, r.end);
-    const clampedDb = clamp(db, minDb, maxDb);
-    return { ...r, db: clampedDb };
-  });
-}
-
-// ---------- Build a simple timeline for scrub preview ----------
-function buildDbTimeline(rows, durationSec, minDb, maxDb) {
+// ---------- Build dB timeline directly from audio ----------
+function buildDbTimeline(durationSec, minDb, maxDb) {
   // sample every 0.05s (matches scrub step)
   const step = 0.05;
   const samples = [];
-  let i = 0;
 
   for (let t = 0; t <= durationSec + 1e-9; t += step){
-    // advance row index if needed
-    while (i < rows.length && t > rows[i].end) i++;
-    let db = NaN;
-
-    if (i < rows.length && t >= rows[i].start && t <= rows[i].end) db = rows[i].db;
-
-    // treat outside words as silence floor (minDb)
-    if (Number.isNaN(db)) db = minDb;
+    // Get dB from audio at this time point
+    let db = minDb; // default to silence floor
+    
+    if (audioBuffer) {
+      const amp = getAudioAmplitudeAtTime(t);
+      db = amplitudeToDb(amp);
+      db = clamp(db, minDb, maxDb);
+    }
 
     samples.push({ t: Number(t.toFixed(2)), db });
   }
@@ -179,12 +209,12 @@ function buildDbTimeline(rows, durationSec, minDb, maxDb) {
 }
 
 // ---------- Render ----------
-function renderWords(rows, minDb, maxDb) {
+function renderWords(rows, minDb, maxDb, mode = 'neutral') {
   const container = document.getElementById("wordOutput");
   container.innerHTML = "";
 
   rows.forEach((r, idx) => {
-    const size = dbToFontPx(r.db, minDb, maxDb);
+    const size = mapDbToSize(r.db, minDb, maxDb, mode);
     const span = document.createElement("span");
     span.className = "word";
     span.textContent = r.word;
@@ -202,12 +232,12 @@ function renderWords(rows, minDb, maxDb) {
   });
 }
 
-function renderTable(rows, minDb, maxDb) {
+function renderTable(rows, minDb, maxDb, mode = 'neutral') {
   const tbody = document.querySelector("#metaTable tbody");
   tbody.innerHTML = "";
 
   rows.forEach((r, i) => {
-    const size = dbToFontPx(r.db, minDb, maxDb);
+    const size = mapDbToSize(r.db, minDb, maxDb, mode);
     const dbMean = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
     const dbMax = r.dbMax !== undefined ? r.dbMax.toFixed(1) : '—';
     const tr = document.createElement("tr");
@@ -234,12 +264,12 @@ function escapeHtml(str){
 }
 
 // ---------- CSV Download ----------
-function rowsToCsv(rows, minDb, maxDb) {
+function rowsToCsv(rows, minDb, maxDb, mode = 'neutral') {
   const header = ["index","word","start","end","dbMean","dbMax","font_px"];
   const lines = [header.join(",")];
 
   rows.forEach((r, i) => {
-    const size = dbToFontPx(r.db, minDb, maxDb);
+    const size = mapDbToSize(r.db, minDb, maxDb, mode);
     const safeWord = `"${String(r.word).replaceAll('"','""')}"`;
     const dbMean = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
     const dbMax = r.dbMax !== undefined ? r.dbMax.toFixed(1) : r.db.toFixed(1);
@@ -278,49 +308,102 @@ function getDbAtTime(t){
   return dbTimeline[idx].db;
 }
 
-// ---------- Main Generate ----------
-function generate(){
+// ---------- Main Machine Runner ----------
+function runMachine(){
   const status = document.getElementById("status");
   const text = document.getElementById("textInput").value;
-
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
+  const mode = document.getElementById("mapMode").value;
 
-  if (!audioBuffer) {
-    status.textContent = "Please upload a WAV file first.";
-    return;
+  try {
+    // === STEP 1: Validate audio loaded and duration = 30s ===
+    status.textContent = "🔍 Validating audio...";
+    
+    if (!audioBuffer) {
+      status.textContent = "❌ Please upload an audio file first.";
+      return;
+    }
+
+    const durationSec = audioBuffer.duration;
+    const REQUIRED_DURATION = 30.0;
+    
+    if (Math.abs(durationSec - REQUIRED_DURATION) > 0.1) {
+      status.textContent = `❌ Audio must be exactly 30s. Your file is ${durationSec.toFixed(2)}s.`;
+      return;
+    }
+
+    // === STEP 2: Validate text input ===
+    if (!text.trim()){
+      status.textContent = "❌ Please enter text.";
+      return;
+    }
+    
+    if (!(maxDb > minDb)){
+      status.textContent = "❌ Max dB must be greater than Min dB.";
+      return;
+    }
+
+    durationGlobal = durationSec;
+
+    // === STEP 3: Decoding audio & measuring dB ===
+    status.textContent = "🎵 Measuring dB from audio...";
+    dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
+    
+    if (!dbTimeline || dbTimeline.length === 0) {
+      status.textContent = "❌ Failed to analyze audio.";
+      return;
+    }
+
+    // === STEP 4: Tokenize text input into words ===
+    status.textContent = "📝 Tokenizing text...";
+    const words = tokenize(text);
+    
+    if (words.length === 0) {
+      status.textContent = "❌ No words found in text.";
+      return;
+    }
+
+    // === STEP 5: Generate deterministic timestamps across 30s ===
+    status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
+    const wordRows = makeTimestamps(words);
+    
+    if (!wordRows || wordRows.length === 0) {
+      status.textContent = "❌ Failed to generate timestamps.";
+      return;
+    }
+    
+    // === STEP 6: Assign dbMean/dbMax per word window ===
+    status.textContent = "📊 Mapping dB to words...";
+    const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb);
+    
+    if (!rows || rows.length === 0) {
+      status.textContent = "❌ Failed to map dB values to words.";
+      return;
+    }
+
+    currentRows = rows;
+
+    // === STEP 7: Render words (Arial black on white) ===
+    status.textContent = "🎨 Rendering output...";
+    renderWords(rows, minDb, maxDb, mode);
+    
+    // === STEP 8: Render table and enable CSV download ===
+    renderTable(rows, minDb, maxDb, mode);
+    setScrubUI(durationSec);
+
+    document.getElementById("durationSec").value = durationSec.toFixed(2);
+
+    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode}`;
+    
+  } catch (error) {
+    status.textContent = `❌ Error: ${error.message}`;
+    console.error("runMachine error:", error);
   }
-
-  const durationSec = audioBuffer.duration;
-  durationGlobal = durationSec;
-
-  if (!text.trim()){
-    status.textContent = "Please enter text.";
-    return;
-  }
-  if (!(maxDb > minDb)){
-    status.textContent = "Max dB must be greater than Min dB.";
-    return;
-  }
-
-  const words = tokenize(text);
-  const tRows = makeTimestamps(words);
-  const rows = makeDbPerWord(tRows, minDb, maxDb);
-
-  currentRows = rows;
-  dbTimeline = buildDbTimeline(rows, durationSec, minDb, maxDb);
-
-  renderWords(rows, minDb, maxDb);
-  renderTable(rows, minDb, maxDb);
-  setScrubUI(durationSec);
-
-  document.getElementById("durationSec").value = durationSec.toFixed(2);
-
-  status.textContent = `Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s from WAV file`;
 }
 
 // ---------- Wire up events ----------
-document.getElementById("generateBtn").addEventListener("click", generate);
+document.getElementById("generateBtn").addEventListener("click", runMachine);
 
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -356,12 +439,13 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
 document.getElementById("downloadCsvBtn").addEventListener("click", () => {
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
+  const mode = document.getElementById("mapMode").value;
 
   if (!currentRows.length){
     document.getElementById("status").textContent = "Nothing to download yet — click Generate first.";
     return;
   }
-  const csv = rowsToCsv(currentRows, minDb, maxDb);
+  const csv = rowsToCsv(currentRows, minDb, maxDb, mode);
   downloadTextFile("generated_word_db_data.csv", csv, "text/csv");
 });
 
