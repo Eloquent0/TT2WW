@@ -22,13 +22,13 @@
       <div class="card">
         <h2>Inputs</h2>
 
-        <label class="label">Text</label>
-        <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
-
         <div class="field">
           <label class="label">Upload WAV File</label>
           <input id="wavFileInput" type="file" accept=".wav,audio/wav" class="input">
         </div>
+
+        <label class="label">Text</label>
+        <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
         <div class="row row3">
           <div class="field">
@@ -50,7 +50,7 @@
           <button id="downloadCsvBtn" class="btn">Download CSV</button>
         </div>
 
-        <p id="status" class="status">Upload a WAV file to begin.</p>
+        <p id="status" class="status flashing">Upload a WAV file to begin.</p>
       </div>
 
       <div class="card">

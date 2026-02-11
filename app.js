@@ -263,6 +263,7 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
   if (!file) return;
   
   const status = document.getElementById("status");
+  status.classList.remove("flashing");
   status.textContent = "Loading WAV file...";
   
   try {

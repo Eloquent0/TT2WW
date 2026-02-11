@@ -111,3 +111,13 @@ body {
   border-radius: 16px;
   padding: 16px;
 }
+
+/* Flashing animation for status */
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.flashing {
+  animation: flash 1.5s ease-in-out infinite;
+}
