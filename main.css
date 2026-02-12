@@ -1,23 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
 
 /* =========================
-   Eurostile Font Definitions
-   ========================= */
-@font-face {
-  font-family: "Eurostile";
-  src: url("./fonts/Eurostile-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: "Eurostile";
-  src: url("./fonts/Eurostile-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-}
-
-/* =========================
    Global Styles
    ========================= */
 body {
@@ -33,7 +16,7 @@ body {
       #0b1a2a 100%
     );
   color: #b3e217;
-  font-family: 'Michroma', sans-serif;
+  font-family: 'Michroma', sans-serif; /* Keep Michroma as the global font */
 }
 
 /* =========================
@@ -42,20 +25,20 @@ body {
 .title {
   margin: 0;
   font-size: 64px;
-  font-weight: 700;      /* Eurostile Bold */
-  font-family: "Eurostile", sans-serif; /* Use Eurostile font */
-  font-style: italic;   /* Synthetic italic (correct for Eurostile) */
+  font-weight: 700;      /* Keep bold weight */
+  font-family: 'Michroma', sans-serif; /* Use Michroma font */
+  font-style: italic;   /* Keep italic style */
   letter-spacing: -.1em;
   text-transform: uppercase;
   color: #62d12b;
   text-align: center;
-  -webkit-text-stroke: 2px #62d12b;
-  text-shadow: 2px #62d12b;
+  -webkit-text-stroke: 2px #62d12b; /* Keep stroke */
+  text-shadow: 2px #62d12b; /* Keep shadow */
 }
 
 /* Optional subtitle under title */
 .sub {
-  font-family: "Eurostile", Arial, sans-serif;
+  font-family: "Eurostile", Arial, sans-serif; /* You can keep this or change to Michroma */
   font-weight: 400;
   font-style: normal;
   color: #b3e217;
