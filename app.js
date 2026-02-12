@@ -384,28 +384,11 @@ function dbToColor(db, minDb, maxDb, pitchHz) {
   // Apply exponential curve to make it more sensitive (emphasize louder sounds)
   t = Math.pow(t, 0.6); // Makes transition faster toward red
 
-  if (Number.isFinite(pitchHz)) {
-    const hue = pitchToHue(pitchHz);
-    const saturation = 80;
-    const lightness = Math.round(25 + 55 * t);
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  }
-
-  // Fallback: Discrete color steps - blue → lighter blue → red-purple → dark red
-  // Define color steps (avoiding pink, focusing on blues and dark reds)
-  const colors = [
-    { r: 70, g: 70, b: 200 },      // Blue (quietest)
-    { r: 120, g: 140, b: 255 },    // Lighter Blue
-    { r: 150, g: 60, b: 180 },     // Red-Purple
-    { r: 180, g: 40, b: 100 },     // Dark Red-Purple
-    { r: 200, g: 30, b: 50 }       // Dark Red (loudest)
-  ];
-  
-  // Map t to discrete steps
-  const stepIndex = Math.min(Math.floor(t * colors.length), colors.length - 1);
-  const color = colors[stepIndex];
-  
-  return `rgb(${color.r}, ${color.g}, ${color.b})`;
+  // RGB gradient: blue → red (used for both pitch and fallback)
+  const r = Math.round(100 + (155 * t));
+  const g = Math.round(150 - (70 * t));
+  const b = Math.round(255 - (175 * t));
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 // ---------- Render ----------
