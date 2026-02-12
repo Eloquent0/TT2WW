@@ -420,28 +420,3 @@ h1{
   color:#cfe0ff;
   background: rgba(0,0,0,0.18);
 }
-
-.tabs {
-  display: flex;
-  justify-content: flex-start;
-  margin-bottom: 20px;
-}
-
-.tabs ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-.tabs li {
-  margin-right: 20px;
-}
-
-.tabs a {
-  text-decoration: none;
-  color: #b3e217; /* Adjust color as needed */
-  font-weight: bold;
-}
-
-.tabs a:hover {
-  text-decoration: underline;
-}
