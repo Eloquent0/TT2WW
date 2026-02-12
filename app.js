@@ -413,6 +413,8 @@ function renderWords(rows, minDb, maxDb, mode = 'neutral') {
     span.style.fontSize = `${size}px`;
     span.style.lineHeight = "1.05";
     span.style.color = color;
+    const spacing = clamp(Math.round(size * 0.18), 6, 48);
+    span.style.marginRight = `${spacing}px`;
 
     // Hover tooltip
     const dbMeanStr = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
@@ -421,7 +423,6 @@ function renderWords(rows, minDb, maxDb, mode = 'neutral') {
     span.title = `#${idx+1}\n${r.start.toFixed(2)}–${r.end.toFixed(2)}s\nMean: ${dbMeanStr} dB${dbMaxStr}\nPitch: ${pitchStr}\n${size}px`;
 
     container.appendChild(span);
-    container.appendChild(document.createTextNode(" "));
   });
 }
 
