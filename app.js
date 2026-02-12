@@ -388,12 +388,12 @@ function dbToColor(db, minDb, maxDb, pitchHz) {
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   }
 
-  // Fallback: Interpolate blue → red (no green)
+  // Fallback: Interpolate blue → magenta
   // Blue: rgb(100, 100, 255)
-  // Red: rgb(255, 80, 80)
+  // Magenta: rgb(255, 0, 255)
   const r = Math.round(100 + (155 * t));  // 100 → 255
-  const g = Math.round(100 - (20 * t));   // 100 → 80
-  const b = Math.round(255 - (175 * t));  // 255 → 80
+  const g = Math.round(100 - (100 * t));  // 100 → 0
+  const b = 255;                          // stays at 255
   
   return `rgb(${r}, ${g}, ${b})`;
 }
