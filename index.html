@@ -10,10 +10,17 @@
 
 <body>
   <div class="app">
+    <nav class="tabs">
+      <ul>
+        <li><a href="explanation.html">Explanation</a></li>
+        <li><a href="about.html">About</a></li>
+      </ul>
+    </nav>
+
     <header class="topbar">
       <div>
-        <h1><h1 class="title">TT2WW</h1>
-<p class="sub">Word → dB Translation Machine</p></h1>
+        <h1 class="title">TT2WW</h1>
+        <p class="sub">Word → dB Translation Machine</p>
         <p class="sub">Upload a WAV file to analyze audio amplitude and drive typographic size per word.</p>
       </div>
       <div class="badge">5:00</div>
@@ -22,10 +29,14 @@
     <section class="grid">
       <div class="card">
         <h2>Inputs</h2>
+        <details>
+          <summary>Input Details</summary>
+          <p>Upload audio or video files and configure settings for analysis.</p>
+        </details>
 
         <div class="field">
           <label class="label">Upload Audio/Video File (5 minutes or less)</label>
-          <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*" class="input">
+          <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*" class="input>
         </div>
 
         <div class="field">
@@ -72,7 +83,11 @@
 
       <div class="card">
         <h2>Output</h2>
-        
+        <details>
+          <summary>Output Details</summary>
+          <p>This section displays the generated typography output based on the audio analysis.</p>
+        </details>
+
         <div id="wordOutput" class="output" aria-label="Generated typography output">
           <div class="legend">
             <span class="legend-label">Pitch (hue) + Volume (lightness):</span>
@@ -96,6 +111,11 @@
 
     <section class="card">
       <h2>Generated Data</h2>
+      <details>
+        <summary>Data Details</summary>
+        <p>This section contains the generated data from the audio analysis.</p>
+      </details>
+
       <div class="tableWrap">
         <table id="metaTable" class="table">
           <thead>
