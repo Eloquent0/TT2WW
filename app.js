@@ -388,12 +388,25 @@ function dbToColor(db, minDb, maxDb, pitchHz) {
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   }
 
-  // Fallback: Interpolate from blue (quiet) to red (loud)
+  // Fallback: Interpolate blue → purple → red based on loudness
   // Blue: rgb(100, 150, 255)
+  // Purple: rgb(200, 100, 255)
   // Red: rgb(255, 80, 80)
-  const r = Math.round(100 + (155 * t));
-  const g = Math.round(150 - (70 * t));
-  const b = Math.round(255 - (175 * t));
+  let r, g, b;
+  
+  if (t < 0.5) {
+    // Blue to Purple
+    const t2 = t * 2; // 0 to 1
+    r = Math.round(100 + (100 * t2));  // 100 → 200
+    g = Math.round(150 - (50 * t2));   // 150 → 100
+    b = Math.round(255);                // stays at 255
+  } else {
+    // Purple to Red
+    const t2 = (t - 0.5) * 2; // 0 to 1
+    r = Math.round(200 + (55 * t2));   // 200 → 255
+    g = Math.round(100 - (20 * t2));   // 100 → 80
+    b = Math.round(255 - (175 * t2));  // 255 → 80
+  }
   
   return `rgb(${r}, ${g}, ${b})`;
 }
