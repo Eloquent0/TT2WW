@@ -34,15 +34,12 @@ body {
   /* Gradient background for text */
   background: linear-gradient(to bottom, #4caf50, #62d12b, #4caf50); 
   -webkit-background-clip: text; /* Clip background to text */
+  background-clip: text; /* Standard property for compatibility */
+  background-clip: text; /* Standard property for compatibility */
   -webkit-text-fill-color: transparent; /* Make text fill transparent */
   
-  /* Text shadow for path offset effect */
-  text-shadow: 
-    2px 2px 0 #62d12b, /* Right bottom shadow */
-    -2px -2px 0 #62d12b, /* Left top shadow */
-    2px -2px 0 #62d12b, /* Right top shadow */
-    -2px 2px 0 #62d12b; /* Left bottom shadow */
-  
+  /* Stroke effect */
+  -webkit-text-stroke: 2px transparent; /* Set stroke to transparent */
   text-align: center;
   position: relative; /* Position for layering */
 }
@@ -62,6 +59,7 @@ body {
   background: linear-gradient(to bottom, #317133, #62d12b, #317133); /* Same gradient */
   -webkit-background-clip: text; /* Clip background to text */
   -webkit-text-fill-color: transparent; /* Make text fill transparent */
+  -webkit-text-stroke: 2px #62d12b; /* Stroke with the desired color */
   z-index: -1; /* Place behind the main text */
 }
 
