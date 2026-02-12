@@ -1,7 +1,7 @@
 :root{
   --bg:#0b0f17;
   --card:#0f1623;
-  --muted:#9aa7bZd;
+  --muted:#9aa7b0d;
   --text:#e7eefc;
   --line:#233046;
   --accent:#7aa7ff;
