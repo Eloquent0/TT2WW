@@ -30,7 +30,9 @@ body {
   font-style: italic;   /* Keep italic style */
   letter-spacing: -.1em;
   text-transform: uppercase;
-  color: #62d12b;
+  background: linear-gradient(to bottom, #4caf50, #62d12b, #4caf50); /* Gradient from top to bottom */
+  -webkit-background-clip: text; /* Clip background to text */
+  -webkit-text-fill-color: transparent; /* Make text fill transparent */
   text-align: center;
   -webkit-text-stroke: 2px #62d12b; /* Keep stroke */
   text-shadow: 2px #62d12b; /* Keep shadow */
