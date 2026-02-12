@@ -388,14 +388,21 @@ function dbToColor(db, minDb, maxDb, pitchHz) {
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   }
 
-  // Fallback: Interpolate blue → magenta
-  // Blue: rgb(100, 100, 255)
-  // Magenta: rgb(255, 0, 255)
-  const r = Math.round(100 + (155 * t));  // 100 → 255
-  const g = Math.round(100 - (100 * t));  // 100 → 0
-  const b = 255;                          // stays at 255
+  // Fallback: Discrete color steps - blue → lighter blue → violet → magenta → red
+  // Define color steps
+  const colors = [
+    { r: 80, g: 80, b: 255 },      // Blue (quietest)
+    { r: 150, g: 180, b: 255 },    // Lighter Blue
+    { r: 180, g: 100, b: 255 },    // Violet
+    { r: 255, g: 50, b: 255 },     // Magenta
+    { r: 255, g: 50, b: 100 }      // Red (loudest)
+  ];
   
-  return `rgb(${r}, ${g}, ${b})`;
+  // Map t to discrete steps
+  const stepIndex = Math.min(Math.floor(t * colors.length), colors.length - 1);
+  const color = colors[stepIndex];
+  
+  return `rgb(${color.r}, ${color.g}, ${color.b})`;
 }
 
 // ---------- Render ----------
