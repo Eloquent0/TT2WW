@@ -30,12 +30,35 @@ body {
   font-style: italic;   /* Keep italic style */
   letter-spacing: -.1em;
   text-transform: uppercase;
-  background: linear-gradient(to bottom, #4caf50, #62d12b, #4caf50); /* Gradient from top to bottom */
+  
+  /* Gradient background for text */
+  background: linear-gradient(to bottom, #4caf50, #62d12b, #4caf50); 
   -webkit-background-clip: text; /* Clip background to text */
   -webkit-text-fill-color: transparent; /* Make text fill transparent */
+  
+  /* Stroke effect */
+  -webkit-text-stroke: 2px transparent; /* Set stroke to transparent */
   text-align: center;
-  -webkit-text-stroke: 2px #62d12b; /* Keep stroke */
-  text-shadow: 2px #62d12b; /* Keep shadow */
+  position: relative; /* Position for layering */
+}
+
+/* Adding a pseudo-element for the stroke effect */
+.title::before {
+  content: "TT2WW"; /* Same text as the title */
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 64px; /* Same size as the title */
+  font-weight: 700; /* Same weight */
+  font-family: 'Michroma', sans-serif; /* Same font */
+  font-style: italic; /* Same style */
+  letter-spacing: -.1em;
+  text-transform: uppercase;
+  background: linear-gradient(to bottom, #4caf50, #62d12b, #4caf50); /* Same gradient */
+  -webkit-background-clip: text; /* Clip background to text */
+  -webkit-text-fill-color: transparent; /* Make text fill transparent */
+  -webkit-text-stroke: 2px #62d12b; /* Stroke with the desired color */
+  z-index: -1; /* Place behind the main text */
 }
 
 /* Optional subtitle under title */
