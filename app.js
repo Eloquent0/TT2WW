@@ -367,7 +367,10 @@ function pitchToHue(pitchHz, minHz = 80, maxHz = 1000) {
     0,
     1
   );
-  return Math.round(240 - 240 * t);
+  // Map to blue (240°) → magenta (300°) → red (0°/360°)
+  // Avoiding green/yellow/cyan entirely
+  const hue = Math.round(240 + 120 * t); // 240 to 360
+  return hue >= 360 ? hue - 360 : hue; // Wrap 360 to 0 for red
 }
 
 // ---------- dB to Color mapping (pitch = hue, loudness = lightness) ----------
