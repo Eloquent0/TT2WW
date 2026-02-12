@@ -391,14 +391,14 @@ function dbToColor(db, minDb, maxDb, pitchHz) {
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   }
 
-  // Fallback: Discrete color steps - blue → lighter blue → violet → magenta → red
-  // Define color steps
+  // Fallback: Discrete color steps - blue → lighter blue → red-purple → dark red
+  // Define color steps (avoiding pink, focusing on blues and dark reds)
   const colors = [
-    { r: 80, g: 80, b: 255 },      // Blue (quietest)
-    { r: 150, g: 180, b: 255 },    // Lighter Blue
-    { r: 180, g: 100, b: 255 },    // Violet
-    { r: 255, g: 50, b: 255 },     // Magenta
-    { r: 255, g: 50, b: 100 }      // Red (loudest)
+    { r: 70, g: 70, b: 200 },      // Blue (quietest)
+    { r: 120, g: 140, b: 255 },    // Lighter Blue
+    { r: 150, g: 60, b: 180 },     // Red-Purple
+    { r: 180, g: 40, b: 100 },     // Dark Red-Purple
+    { r: 200, g: 30, b: 50 }       // Dark Red (loudest)
   ];
   
   // Map t to discrete steps
