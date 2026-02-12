@@ -43,6 +43,7 @@ body {
   margin: 0;
   font-size: 64px;
   font-weight: 700;      /* Eurostile Bold */
+  font-family: "Eurostile", sans-serif; /* Use Eurostile font */
   font-style: italic;   /* Synthetic italic (correct for Eurostile) */
   letter-spacing: -.1em;
   text-transform: uppercase;
