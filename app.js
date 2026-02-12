@@ -374,7 +374,7 @@ function pitchToHue(pitchHz, minHz = 80, maxHz = 1000) {
 }
 
 // ---------- dB to Color mapping (pitch = hue, loudness = lightness) ----------
-function dbToColor(db, minDb, maxDb, pitchHz) {
+function dbToColor(db,minDb, maxDb, pitchHz) {
   if (maxDb === minDb) return 'rgb(100, 100, 255)'; // default blue
   
   // Normalize to 0-1
