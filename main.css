@@ -32,10 +32,10 @@ body {
   text-transform: uppercase;
   
   /* Gradient background for text */
-  background: linear-gradient(to bottom, #4caf50, #62d12b, #4caf50); 
+  background: linear-gradient(to bottom, #337636, #62d12b, #337636); 
+  background-clip: text; /* Standard property for compatibility */
   -webkit-background-clip: text; /* Clip background to text */
-  background-clip: text; /* Standard property for compatibility */
-  background-clip: text; /* Standard property for compatibility */
+  -moz-background-clip: text; /* Mozilla vendor prefix for compatibility */
   -webkit-text-fill-color: transparent; /* Make text fill transparent */
   
   /* Stroke effect */
