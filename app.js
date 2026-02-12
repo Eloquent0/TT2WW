@@ -228,6 +228,7 @@ function assignDbToWords(wordRows, dbTimeline, minDb = -40, maxDb = -5) {
   
   return wordRows.map(row => {
     const { start, end } = row;
+    const pitchHz = getPitchForWord(start, end);
     
     // Find all samples within this word's time range
     const samplesInRange = dbTimeline.filter(sample => 
@@ -237,7 +238,7 @@ function assignDbToWords(wordRows, dbTimeline, minDb = -40, maxDb = -5) {
     // If no samples found, use silence floor
     if (samplesInRange.length === 0) {
       const clampedSilence = clamp(SILENCE_FLOOR, minDb, maxDb);
-      return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence };
+      return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence, pitchHz };
     }
     
     // Filter out NaN and invalid values
@@ -248,7 +249,7 @@ function assignDbToWords(wordRows, dbTimeline, minDb = -40, maxDb = -5) {
     // If all samples are invalid, use silence floor
     if (validSamples.length === 0) {
       const clampedSilence = clamp(SILENCE_FLOOR, minDb, maxDb);
-      return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence };
+      return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence, pitchHz };
     }
     
     // Calculate dbMean (average)
@@ -263,7 +264,7 @@ function assignDbToWords(wordRows, dbTimeline, minDb = -40, maxDb = -5) {
     const clampedMax = clamp(dbMax, minDb, maxDb);
     
     // Set db = dbMean for font size mapping
-    return { ...row, db: clampedMean, dbMean: clampedMean, dbMax: clampedMax };
+    return { ...row, db: clampedMean, dbMean: clampedMean, dbMax: clampedMax, pitchHz };
   });
 }
 
@@ -289,8 +290,88 @@ function buildDbTimeline(durationSec, minDb, maxDb) {
   return samples;
 }
 
-// ---------- dB to Color mapping (blue=quiet, red=loud) ----------
-function dbToColor(db, minDb, maxDb) {
+// ---------- Pitch Estimation ----------
+function estimatePitchAtTime(time, minHz = 80, maxHz = 1000) {
+  if (!audioBuffer) return null;
+
+  const sampleRate = audioBuffer.sampleRate;
+  const channelData = audioBuffer.getChannelData(0);
+  const windowSize = 2048;
+
+  if (channelData.length < windowSize) return null;
+
+  let center = Math.floor(time * sampleRate);
+  let start = Math.max(0, center - Math.floor(windowSize / 2));
+  if (start + windowSize > channelData.length) {
+    start = channelData.length - windowSize;
+  }
+
+  const buffer = channelData.subarray(start, start + windowSize);
+
+  let energy = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    energy += buffer[i] * buffer[i];
+  }
+
+  const rms = Math.sqrt(energy / buffer.length);
+  if (rms < 0.01) return null;
+
+  let minLag = Math.floor(sampleRate / maxHz);
+  let maxLag = Math.floor(sampleRate / minHz);
+  maxLag = Math.min(maxLag, buffer.length - 1);
+
+  if (minLag >= maxLag) return null;
+
+  let bestLag = -1;
+  let bestCorr = 0;
+
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < buffer.length - lag; i++) {
+      sum += buffer[i] * buffer[i + lag];
+    }
+
+    if (sum > bestCorr) {
+      bestCorr = sum;
+      bestLag = lag;
+    }
+  }
+
+  if (bestLag === -1 || energy === 0) return null;
+
+  const normalized = bestCorr / energy;
+  if (normalized < 0.25) return null;
+
+  return sampleRate / bestLag;
+}
+
+function getPitchForWord(start, end) {
+  if (!audioBuffer) return null;
+  const duration = end - start;
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+
+  const times = [0.25, 0.5, 0.75].map(p => start + duration * p);
+  const pitches = times
+    .map(t => estimatePitchAtTime(t))
+    .filter(p => Number.isFinite(p));
+
+  if (!pitches.length) return null;
+  const sum = pitches.reduce((a, b) => a + b, 0);
+  return sum / pitches.length;
+}
+
+function pitchToHue(pitchHz, minHz = 80, maxHz = 1000) {
+  const clamped = clamp(pitchHz, minHz, maxHz);
+  const t = clamp(
+    Math.log2(clamped / minHz) / Math.log2(maxHz / minHz),
+    0,
+    1
+  );
+  return Math.round(240 - 240 * t);
+}
+
+// ---------- dB to Color mapping (pitch = hue, loudness = lightness) ----------
+function dbToColor(db, minDb, maxDb, pitchHz) {
   if (maxDb === minDb) return 'rgb(100, 100, 255)'; // default blue
   
   // Normalize to 0-1
@@ -299,8 +380,15 @@ function dbToColor(db, minDb, maxDb) {
   
   // Apply exponential curve to make it more sensitive (emphasize louder sounds)
   t = Math.pow(t, 0.6); // Makes transition faster toward red
-  
-  // Interpolate from blue (quiet) to red (loud)
+
+  if (Number.isFinite(pitchHz)) {
+    const hue = pitchToHue(pitchHz);
+    const saturation = 80;
+    const lightness = Math.round(25 + 55 * t);
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  }
+
+  // Fallback: Interpolate from blue (quiet) to red (loud)
   // Blue: rgb(100, 150, 255)
   // Red: rgb(255, 80, 80)
   const r = Math.round(100 + (155 * t));
@@ -317,7 +405,7 @@ function renderWords(rows, minDb, maxDb, mode = 'neutral') {
 
   rows.forEach((r, idx) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
-    const color = dbToColor(r.db, minDb, maxDb);
+    const color = dbToColor(r.db, minDb, maxDb, r.pitchHz);
     const span = document.createElement("span");
     span.className = "word";
     span.textContent = r.word;
@@ -329,7 +417,8 @@ function renderWords(rows, minDb, maxDb, mode = 'neutral') {
     // Hover tooltip
     const dbMeanStr = r.dbMean !== undefined ? r.dbMean.toFixed(1) : r.db.toFixed(1);
     const dbMaxStr = r.dbMax !== undefined ? ` | Max: ${r.dbMax.toFixed(1)}` : '';
-    span.title = `#${idx+1}\n${r.start.toFixed(2)}–${r.end.toFixed(2)}s\nMean: ${dbMeanStr} dB${dbMaxStr}\n${size}px`;
+    const pitchStr = Number.isFinite(r.pitchHz) ? `${r.pitchHz.toFixed(1)} Hz` : '—';
+    span.title = `#${idx+1}\n${r.start.toFixed(2)}–${r.end.toFixed(2)}s\nMean: ${dbMeanStr} dB${dbMaxStr}\nPitch: ${pitchStr}\n${size}px`;
 
     container.appendChild(span);
     container.appendChild(document.createTextNode(" "));
