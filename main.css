@@ -160,10 +160,12 @@ body {
 
 .topbar{
   display:flex;
-  justify-content:space-between;
-  align-items:flex-end;
+  flex-direction: column;
+  justify-content:center;
+  align-items:center;
   gap:16px;
   margin-bottom:16px;
+  text-align: center;
 }
 
 h1{
