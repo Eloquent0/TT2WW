@@ -557,3 +557,7 @@ document.getElementById("scrub").addEventListener("input", (e) => {
 });
 
 document.getElementById("status").textContent = "Upload a WAV file to begin.";
+const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_7fD-sfI8wb8IU8x-x1qALg_kZ0lHuJ4";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
