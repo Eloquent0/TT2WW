@@ -375,6 +375,76 @@ function getDbAtTime(t){
   return dbTimeline[idx].db;
 }
 
+// ---------- Build Creation Payload ----------
+function buildCreationPayload() {
+  const minDb = Number(document.getElementById("minDb").value);
+  const maxDb = Number(document.getElementById("maxDb").value);
+  const mode = document.getElementById("mapMode").value;
+  
+  return {
+    version: "1.0",
+    duration: durationGlobal,
+    title: "TT2WW",
+    data: {
+      words: currentRows,
+      mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode },
+      style: { outputBg: "#fff", outputText: "#000", font: "Arial" }
+    }
+  };
+}
+
+// ---------- Capture Output as PNG ----------
+async function captureOutputPngBlob() {
+  const node = document.getElementById("wordOutput");
+  const canvas = await html2canvas(node, { backgroundColor: "#ffffff", scale: 2 });
+  return await new Promise(res => canvas.toBlob(res, "image/png"));
+}
+
+// ---------- Save Creation to Supabase ----------
+async function saveCreation({ isPublic }) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session) return alert("Please log in first.");
+
+  const payload = buildCreationPayload();
+  const pngBlob = await captureOutputPngBlob();
+
+  // 1) insert DB row first (so we get id)
+  const { data: created, error: insertErr } = await supabase
+    .from("creations")
+    .insert({
+      user_id: session.user.id,
+      title: payload.title ?? "Untitled",
+      is_public: isPublic,
+      data_json: payload
+    })
+    .select("id")
+    .single();
+
+  if (insertErr) return alert(insertErr.message);
+
+  const creationId = created.id;
+  const imagePath = `${session.user.id}/${creationId}.png`;
+
+  // 2) upload image to Storage
+  const { error: upErr } = await supabase
+    .storage
+    .from("tt2ww-images")
+    .upload(imagePath, pngBlob, { contentType: "image/png", upsert: true });
+
+  if (upErr) return alert(upErr.message);
+
+  // 3) save image_path on row
+  const { error: updErr } = await supabase
+    .from("creations")
+    .update({ image_path: imagePath })
+    .eq("id", creationId);
+
+  if (updErr) return alert(updErr.message);
+
+  const shareUrl = `${window.location.origin}/?c=${creationId}`;
+  alert(`Saved! Share link:\n${shareUrl}`);
+}
+
 // ---------- Main Machine Runner ----------
 async function runMachine(){
   const status = document.getElementById("status");
@@ -505,6 +575,33 @@ async function runMachine(){
   }
 }
 
+// ---------- Load Shared Creation ----------
+async function maybeLoadShared() {
+  const id = new URLSearchParams(window.location.search).get("c");
+  if (!id) return;
+
+  const { data, error } = await supabase
+    .from("creations")
+    .select("data_json, image_path, is_public")
+    .eq("id", id)
+    .single();
+
+  if (error) return alert(error.message);
+
+  // Re-render from JSON
+  const payload = data.data_json;
+  const minDb = payload.data.mapping.minDb || -60;
+  const maxDb = payload.data.mapping.maxDb || 0;
+  
+  currentRows = payload.data.words;
+  renderWords(currentRows, minDb, maxDb);
+  renderTable(currentRows, minDb, maxDb);
+  
+  document.getElementById("status").textContent = `✅ Loaded shared creation: ${payload.title}`;
+}
+
+maybeLoadShared();
+
 // ---------- Wire up events ----------
 document.getElementById("generateBtn").addEventListener("click", runMachine);
 
@@ -577,5 +674,8 @@ document.getElementById("scrub").addEventListener("input", (e) => {
   const db = getDbAtTime(t);
   document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : `— dB`;
 });
+
+document.getElementById("saveDraftBtn").addEventListener("click", () => saveCreation({ isPublic: false }));
+document.getElementById("publishBtn").addEventListener("click", () => saveCreation({ isPublic: true }));
 
 document.getElementById("status").textContent = "Upload a WAV file to begin.";
