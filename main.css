@@ -47,6 +47,8 @@ body {
   font-style: normal;
   color: #cfe0ff; /* lighter grey-green */
   text-align: center;
+  margin: 6px 0 0;
+  font-size: 14px;
 }
 
 /* =========================
