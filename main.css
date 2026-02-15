@@ -15,7 +15,7 @@ body {
       #000000 75%,
       #0b1a2a 100%
     );
-  color: #c5d9c5; /* lighter grey-green */
+  color: #ffffff; /* white text */
   font-family: 'Michroma', sans-serif;
 }
 
@@ -75,8 +75,7 @@ body {
 .input {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 400;
-  color: #c5d9c5; /* lighter grey-green */
-
+  color: #ffffff; /* white text */
   background-color: #2a2a2a;
   border: 1px solid rgba(255,255,255,0.25);
   border-radius: 8px;
@@ -94,7 +93,7 @@ body {
 .status {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 400;
-  color: #c5d9c5; /* lighter grey-green */
+  color: #ffffff; /* white text */
 }
 
 /* =========================
@@ -104,7 +103,7 @@ body {
   display: block;
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.04);
-  color: #c5d9c5; /* lighter grey-green */
+  color: #ffffff; /* white text */
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 8px;
@@ -113,7 +112,7 @@ body {
 .btn {
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.04);
-  color: #c5d9c5; /* lighter grey-green */
+  color: #ffffff; /* white text */
   border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
@@ -208,7 +207,7 @@ h1{
   margin:0 0 12px;
   font-size: 15px;
   letter-spacing: 0.02em;
-  color: #cfe0ff;
+  color: #a8d5a8; /* pastel green */
   text-transform: uppercase;
 }
 
