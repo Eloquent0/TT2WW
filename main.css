@@ -15,8 +15,8 @@ body {
       #000000 75%,
       #0b1a2a 100%
     );
-  color: #b3e217;
-  font-family: 'Michroma', sans-serif; /* Keep Michroma as the global font */
+  color: #c5d9c5; /* lighter grey-green */
+  font-family: 'Michroma', sans-serif;
 }
 
 /* =========================
@@ -25,12 +25,12 @@ body {
 .title {
   margin: 0;
   font-size: 64px;
-  font-weight: 700;      /* Keep bold weight */
-  font-family: 'Michroma', sans-serif; /* Use Michroma font */
-  font-style: italic;   /* Keep italic style */
+  font-weight: 700;
+  font-family: 'Michroma', sans-serif;
+  font-style: italic;
   letter-spacing: -.1em;
   text-transform: uppercase;
-  color: #62d12b;
+  color: #a8d5a8; /* pastel green */
   text-align: center;
   position: relative;
 }
@@ -42,10 +42,10 @@ body {
 
 /* Optional subtitle under title */
 .sub {
-  font-family: "Eurostile", Arial, sans-serif; /* You can keep this or change to Michroma */
+  font-family: "Eurostile", Arial, sans-serif;
   font-weight: 400;
   font-style: normal;
-  color: #b3e217;
+  color: #cfe0ff; /* lighter grey-green */
   text-align: center;
 }
 
@@ -75,9 +75,9 @@ body {
 .input {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 400;
-  color: #b3e217;
+  color: #c5d9c5; /* lighter grey-green */
 
-  background-color: #2a2a2a;          /* dark grey background */
+  background-color: #2a2a2a;
   border: 1px solid rgba(255,255,255,0.25);
   border-radius: 8px;
   padding: 10px 12px;
@@ -94,7 +94,7 @@ body {
 .status {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 400;
-  color: #b3e217;
+  color: #c5d9c5; /* lighter grey-green */
 }
 
 /* =========================
@@ -104,7 +104,7 @@ body {
   display: block;
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.04);
-  color: #b3e217;
+  color: #c5d9c5; /* lighter grey-green */
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 8px;
@@ -113,7 +113,7 @@ body {
 .btn {
   border: 1px solid rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.04);
-  color: #b3e217;
+  color: #c5d9c5; /* lighter grey-green */
   border-radius: 12px;
   padding: 10px 12px;
   cursor: pointer;
