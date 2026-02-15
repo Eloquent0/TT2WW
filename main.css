@@ -393,3 +393,14 @@ h1{
   color:#cfe0ff;
   background: rgba(0,0,0,0.18);
 }
+
+.auth {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.auth .input {
+  margin-bottom: 0;
+  max-width: 200px;
+}

@@ -2,6 +2,11 @@
 // Word → dB Translation Machine (WAV File Input)
 // =============================
 
+// ---------- Supabase Configuration ----------
+const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_7fD-sfI8wb8IU8x-x1qALg_kZ0lHuJ4";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 let currentRows = [];
 let dbTimeline = [];
 let durationGlobal = 300;
@@ -503,6 +508,23 @@ async function runMachine(){
 // ---------- Wire up events ----------
 document.getElementById("generateBtn").addEventListener("click", runMachine);
 
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const email = document.getElementById("emailInput").value.trim();
+  if (!email) return alert("Enter email");
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin }
+  });
+  if (error) return alert(error.message);
+  alert("Check your email for the magic link.");
+});
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  alert("Logged out");
+});
+
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -557,7 +579,3 @@ document.getElementById("scrub").addEventListener("input", (e) => {
 });
 
 document.getElementById("status").textContent = "Upload a WAV file to begin.";
-const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_7fD-sfI8wb8IU8x-x1qALg_kZ0lHuJ4";
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
