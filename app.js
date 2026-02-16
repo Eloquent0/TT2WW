@@ -3,7 +3,6 @@
 // =============================
 
 // ---------- Supabase Configuration ----------
-// IMPORTANT: Replace these with your actual Supabase credentials
 const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk"; 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -21,12 +20,10 @@ function lerp(a, b, t){ return a + (b - a) * t; }
 
 // ---------- Auth State Management ----------
 async function initAuth() {
-  // Check for existing session
   const { data: { session } } = await supabase.auth.getSession();
   currentUser = session?.user || null;
   updateAuthUI();
 
-  // Listen for auth changes
   supabase.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
     updateAuthUI();
@@ -73,7 +70,7 @@ function updateAuthUI() {
   }
 }
 
-// ---------- dB → font size mapping ----------
+// dB → font size mapping with different curve modes
 function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120) {
   if (maxDb === minDb) return minPx;
   
@@ -102,14 +99,9 @@ async function loadWavFile(file) {
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  audioBuffer = decodedBuffer;
+  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
   
-  return { 
-    audioBuffer: decodedBuffer, 
-    sampleRate: decodedBuffer.sampleRate, 
-    duration: decodedBuffer.duration 
-  };
+  return { audioBuffer, sampleRate: audioBuffer.sampleRate, duration: audioBuffer.duration };
 }
 
 // ---------- Transcription API Integration ----------
@@ -148,7 +140,7 @@ function amplitudeToDb(amplitude) {
   return amplitude <= 0 ? -80 : 20 * Math.log10(amplitude);
 }
 
-// ---------- Parse timestamped text format ----------
+// ---------- Parse timestamped text format (time\nword\ntime\nword) ----------
 function parseTimestampedText(text) {
   const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
   const result = [];
@@ -195,7 +187,7 @@ function makeTimestamps(words) {
   const n = words.length;
   if (n === 0) return [];
 
-  const DURATION = 300.0;
+  const DURATION = durationGlobal || 300.0;
   const PAUSE_DURATION = 0.15;
   const PUNCTUATION = /[.,!?;:]$/;
   
@@ -323,7 +315,7 @@ function getPitchForWord(start, end) {
   return pitches.length ? pitches.reduce((a, b) => a + b, 0) / pitches.length : null;
 }
 
-// ---------- dB to Color mapping ----------
+// ---------- dB to Color mapping (blue → red gradient, no yellow/green) ----------
 function dbToColor(db, minDb, maxDb) {
   if (maxDb === minDb) return 'rgb(100, 100, 255)';
   
@@ -519,10 +511,9 @@ async function saveCreation({ isPublic }) {
 
     if (updErr) throw updErr;
 
-    const shareUrl = `${window.location.origin}/?c=${creationId}`;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?c=${creationId}`;
     status.textContent = `✅ Saved! ${isPublic ? 'Public' : 'Private'} creation created.`;
     
-    // Show share link
     showShareModal(shareUrl, isPublic);
     
   } catch (error) {
@@ -580,7 +571,6 @@ async function showGallery() {
   `;
   document.body.appendChild(modal);
 
-  // Fetch public creations
   const { data, error } = await supabase
     .from("creations")
     .select("id, title, image_path, created_at, user_id")
@@ -601,7 +591,6 @@ async function showGallery() {
     const card = document.createElement("div");
     card.className = "gallery-card";
     
-    // Get public URL for image
     const { data: urlData } = supabase.storage
       .from("tt2ww-images")
       .getPublicUrl(item.image_path);
@@ -639,7 +628,7 @@ async function maybeLoadShared() {
 
   const { data, error } = await supabase
     .from("creations")
-    .select("data_json, image_path, is_public, title")
+    .select("data_json, image_path, is_public, title, user_id")
     .eq("id", id)
     .single();
 
@@ -653,7 +642,6 @@ async function maybeLoadShared() {
     return;
   }
 
-  // Re-render from JSON
   const payload = data.data_json;
   const minDb = payload.data.mapping.minDb || -60;
   const maxDb = payload.data.mapping.maxDb || 0;
@@ -663,7 +651,6 @@ async function maybeLoadShared() {
   renderWords(currentRows, minDb, maxDb, mode);
   renderTable(currentRows, minDb, maxDb, mode);
   
-  // Update controls
   document.getElementById("minDb").value = minDb;
   document.getElementById("maxDb").value = maxDb;
   document.getElementById("mapMode").value = mode;
@@ -674,83 +661,130 @@ async function maybeLoadShared() {
 // ---------- Main Machine Runner ----------
 async function runMachine(){
   const status = document.getElementById("status");
-  status.textContent = "⏳ Processing...";
-  status.classList.add("flashing");
-
-  console.log("runMachine called:", {
-    audioBuffer: !!audioBuffer,
-    currentAudioFile: !!currentAudioFile,
-    dbTimelineLength: dbTimeline.length
-  });
+  const minDb = Number(document.getElementById("minDb").value);
+  const maxDb = Number(document.getElementById("maxDb").value);
+  const mode = document.getElementById("mapMode").value;
+  const useTranscription = document.getElementById("useTranscription").checked;
 
   try {
-    if (!audioBuffer || !currentAudioFile) {
-      alert("Please upload an audio/video file first.");
-      status.textContent = "❌ No file uploaded.";
-      status.classList.remove("flashing");
+    status.textContent = "🔍 Validating audio...";
+    
+    if (!audioBuffer) {
+      status.textContent = "❌ Please upload an audio file first.";
       return;
     }
 
-    const transcriptText = document.getElementById("transcriptInput").value.trim();
-    if (!transcriptText) {
-      alert("Please paste a transcript.");
-      status.textContent = "❌ No transcript provided.";
-      status.classList.remove("flashing");
+    const durationSec = audioBuffer.duration;
+    const MAX_DURATION = 300.0;
+
+    if (durationSec > MAX_DURATION) {
+      status.textContent = `❌ Audio must be 5 minutes or less. Your file is ${durationSec.toFixed(2)}s.`;
+      return;
+    }
+    
+    if (durationSec <= 0 || !(maxDb > minDb)) {
+      status.textContent = durationSec <= 0 ? "❌ Invalid audio duration." : "❌ Max dB must be greater than Min dB.";
       return;
     }
 
-    const minDb = Number(document.getElementById("minDb").value);
-    const maxDb = Number(document.getElementById("maxDb").value);
-    const mode = document.getElementById("mapMode").value;
+    durationGlobal = durationSec;
 
-    // Parse transcript into words
-    const words = transcriptText.split(/\s+/).filter(w => w.length > 0);
+    let wordRows;
     
-    // Calculate timing for each word
-    const wordDuration = durationGlobal / words.length;
-    
-    status.textContent = "📊 Mapping dB to words...";
-    
-    currentRows = words.map((word, idx) => {
-      const startTime = idx * wordDuration;
-      const endTime = (idx + 1) * wordDuration;
-      
-      // Get dB values for this time range
-      const dbValues = [];
-      for (let t = startTime; t < endTime; t += 0.05) {
-        const db = getDbAtTime(t);
-        if (Number.isFinite(db)) dbValues.push(db);
+    if (useTranscription) {
+      if (!currentAudioFile) {
+        status.textContent = "❌ Audio file not available for transcription.";
+        return;
       }
       
-      const dbMean = dbValues.length > 0 
-        ? dbValues.reduce((a, b) => a + b, 0) / dbValues.length 
-        : -60;
-      const dbMax = dbValues.length > 0 ? Math.max(...dbValues) : -60;
+      status.textContent = "🎙️ Uploading to transcription service...";
+      const transcriptionData = await uploadForTranscription(currentAudioFile);
       
-      return {
-        word,
-        start: startTime,
-        end: endTime,
-        db: dbMean,
-        dbMean,
-        dbMax
-      };
-    });
+      if (!transcriptionData?.words?.length) {
+        status.textContent = "❌ No words received from transcription service.";
+        return;
+      }
+      
+      wordRows = transcriptionData.words.map(w => ({ word: w.word, start: w.start, end: w.end }));
+      status.textContent = `✅ Received ${wordRows.length} words from transcription service.`;
+      
+    } else {
+      const text = document.getElementById("textInput").value;
+      
+      if (!text.trim()){
+        status.textContent = "❌ Please enter text.";
+        return;
+      }
+      
+      const hasTimestamps = /^\d+:\d{2}/m.test(text);
+      
+      if (hasTimestamps) {
+        status.textContent = "📝 Parsing timestamped text...";
+        const timestampedSegments = parseTimestampedText(text);
+        
+        if (!timestampedSegments.length) {
+          status.textContent = "❌ No valid timestamps found.";
+          return;
+        }
+        
+        wordRows = timestampsToWordRows(timestampedSegments);
+        
+        if (!wordRows.length) {
+          status.textContent = "❌ No words found in timestamped text.";
+          return;
+        }
+        
+        status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
+      } else {
+        status.textContent = "📝 Tokenizing text...";
+        const words = tokenize(text);
+        
+        if (!words.length) {
+          status.textContent = "❌ No words found in text.";
+          return;
+        }
 
-    console.log("Generated rows:", currentRows.length);
+        status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
+        wordRows = makeTimestamps(words);
+      }
+    }
 
-    // Render the results
+    if (!wordRows?.length) {
+      status.textContent = "❌ Failed to generate timestamps.";
+      return;
+    }
+
+    status.textContent = "🎵 Measuring dB from audio...";
+    dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
+    
+    if (!dbTimeline?.length) {
+      status.textContent = "❌ Failed to analyze audio.";
+      return;
+    }
+    
+    status.textContent = "📊 Mapping dB to words...";
+    const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb);
+    
+    if (!rows?.length) {
+      status.textContent = "❌ Failed to map dB values to words.";
+      return;
+    }
+
+    currentRows = rows;
+
     status.textContent = "🎨 Rendering output...";
-    renderWords(currentRows, minDb, maxDb, mode);
-    renderTable(currentRows, minDb, maxDb, mode);
+    renderWords(rows, minDb, maxDb, mode);
+    renderTable(rows, minDb, maxDb, mode);
+    setScrubUI(durationSec);
 
-    status.textContent = `✅ Generated ${currentRows.length} words!`;
-    status.classList.remove("flashing");
+    document.getElementById("durationSec").value = durationSec.toFixed(2);
 
+    const source = useTranscription ? 'API transcription' : 'manual text';
+    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode} • Source: ${source}`;
+    
   } catch (error) {
     status.textContent = `❌ Error: ${error.message}`;
-    status.classList.remove("flashing");
-    console.error("Machine error:", error);
+    console.error("runMachine error:", error);
   }
 }
 
@@ -783,75 +817,33 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  console.log("File selected:", file);
-  
-  if (!file) {
-    console.log("No file selected");
-    return;
-  }
+  if (!file) return;
   
   const status = document.getElementById("status");
   status.classList.remove("flashing");
-  status.textContent = "⏳ Loading audio file...";
+  status.textContent = "Loading audio file...";
   
   try {
-    console.log("Starting to load file:", file.name, file.type, file.size);
-    
-    // Load the audio buffer
-    const result = await loadWavFile(file);
-    console.log("loadWavFile result:", result);
-    
-    const duration = audioBuffer.duration;
-    console.log("Audio duration:", duration);
+    const { duration } = await loadWavFile(file);
     
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
-        ? `❌ Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
-        : `❌ Error: Invalid audio duration.`;
+        ? `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
+        : `Error: Invalid audio duration.`;
       audioBuffer = null;
       currentAudioFile = null;
-      dbTimeline = [];
-      durationGlobal = 300;
       document.getElementById("durationSec").value = "0";
       e.target.value = "";
       return;
     }
     
     currentAudioFile = file;
-    durationGlobal = duration;
-    
-    // Update the duration display
     document.getElementById("durationSec").value = duration.toFixed(2);
-    console.log("Set currentAudioFile and durationGlobal:", duration);
-    
-    // Build dB timeline
-    const minDb = Number(document.getElementById("minDb").value) || -60;
-    const maxDb = Number(document.getElementById("maxDb").value) || 0;
-    
-    status.textContent = "⏳ Analyzing audio amplitude...";
-    console.log("Building dB timeline with minDb:", minDb, "maxDb:", maxDb);
-    dbTimeline = buildDbTimeline(duration, minDb, maxDb);
-    console.log("Built dbTimeline with", dbTimeline.length, "samples");
-    
-    if (dbTimeline.length > 0) {
-      console.log("First sample:", dbTimeline[0]);
-      console.log("Last sample:", dbTimeline[dbTimeline.length - 1]);
-      console.log("Sample dB values:", dbTimeline.slice(0, 10).map(s => s.db));
-    }
-    
-    setScrubUI(duration);
-    
-    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s, ${dbTimeline.length} samples). Paste transcript and click Generate.`;
-    
+    status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz). Click Generate.`;
   } catch (error) {
-    status.textContent = `❌ Error loading audio file: ${error.message}`;
-    console.error("Audio load error:", error);
-    console.error("Error stack:", error.stack);
+    status.textContent = `Error loading audio file: ${error.message}`;
+    console.error(error);
     audioBuffer = null;
-    currentAudioFile = null;
-    dbTimeline = [];
-    durationGlobal = 300;
-    document.getElementById("durationSec").value = "0";
     e.target.value = "";
   }
 });
