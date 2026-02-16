@@ -3,29 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Word → dB Translation Machine</title>
+  <title>TT2WW - Word → dB Translation Machine</title>
   <link rel="stylesheet" href="./main.css" />
   <link rel="icon" type="image/png" href="Logo.png">
 </head>
 
 <body>
   <div class="app">
-    <nav class="tabs">
-      <ul>
-        <!-- Removed Explanation and About tabs -->
-      </ul>
-    </nav>
-
     <header class="topbar">
       <div>
         <h1 class="title">TT2WW</h1>
         <p class="sub">Word → dB Translation Machine</p>
-        <p class="sub">Upload a WAV file to analyze audio amplitude and drive typographic size per word.</p>
+        <p class="sub">Upload audio/video to analyze amplitude and drive typographic size per word.</p>
       </div>
       <div class="auth">
-        <input id="emailInput" class="input" placeholder="email@example.com">
+        <span id="authInfo" class="auth-info"></span>
+        <input id="emailInput" class="input" placeholder="email@example.com" type="email">
         <button id="loginBtn" class="btn">Login (Magic Link)</button>
-        <button id="logoutBtn" class="btn ghost">Logout</button>
+        <button id="galleryBtn" class="btn" style="display:none;">🎨 Gallery</button>
+        <button id="logoutBtn" class="btn ghost" style="display:none;">Logout</button>
       </div>
       <div class="badge">5:00</div>
     </header>
@@ -64,7 +60,7 @@
 
         <div class="row row3">
           <div class="field">
-            <label class="label">Duration (s) - from WAV</label>
+            <label class="label">Duration (s) - from file</label>
             <input id="durationSec" class="input" type="number" value="0" readonly>
           </div>
           <div class="field">
@@ -82,7 +78,12 @@
           <button id="downloadCsvBtn" class="btn">Download CSV</button>
         </div>
 
-        <p id="status" class="status flashing">Upload a WAV file to begin.</p>
+        <div class="row row2 actions">
+          <button id="saveDraftBtn" class="btn" disabled>💾 Save Draft</button>
+          <button id="publishBtn" class="btn" disabled>🌍 Publish Public</button>
+        </div>
+
+        <p id="status" class="status flashing">Upload an audio/video file to begin.</p>
       </div>
 
       <div class="card">
@@ -94,11 +95,11 @@
 
         <div id="wordOutput" class="output" aria-label="Generated typography output">
           <div class="legend">
-            <span class="legend-label">Pitch (hue) + Volume (lightness):</span>
+            <span class="legend-label">Volume → Size + Color:</span>
             <div class="legend-gradient"></div>
             <div class="legend-labels">
-              <span>Low pitch / quiet</span>
-              <span>High pitch / loud</span>
+              <span>Quiet / Small</span>
+              <span>Loud / Large</span>
             </div>
           </div>
         </div>

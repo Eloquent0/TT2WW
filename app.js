@@ -3,8 +3,9 @@
 // =============================
 
 // ---------- Supabase Configuration ----------
+// IMPORTANT: Replace these with your actual Supabase credentials
 const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_7fD-sfI8wb8IU8x-x1qALg_kZ0lHuJ4";
+const SUPABASE_ANON_KEY = "YOUR_ACTUAL_ANON_KEY_HERE"; // Replace with real anon key from Supabase dashboard
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRows = [];
@@ -13,11 +14,62 @@ let durationGlobal = 300;
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
+let currentUser = null;
 
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t){ return a + (b - a) * t; }
 
-// dB → font size mapping with different curve modes
+// ---------- Auth State Management ----------
+async function initAuth() {
+  // Check for existing session
+  const { data: { session } } = await supabase.auth.getSession();
+  currentUser = session?.user || null;
+  updateAuthUI();
+
+  // Listen for auth changes
+  supabase.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user || null;
+    updateAuthUI();
+    
+    if (event === 'SIGNED_IN') {
+      document.getElementById("status").textContent = `✅ Logged in as ${currentUser.email}`;
+    } else if (event === 'SIGNED_OUT') {
+      document.getElementById("status").textContent = "Logged out successfully";
+    }
+  });
+}
+
+function updateAuthUI() {
+  const emailInput = document.getElementById("emailInput");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authInfo = document.getElementById("authInfo");
+  const saveDraftBtn = document.getElementById("saveDraftBtn");
+  const publishBtn = document.getElementById("publishBtn");
+  const galleryBtn = document.getElementById("galleryBtn");
+
+  if (currentUser) {
+    emailInput.style.display = "none";
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    authInfo.textContent = `Logged in: ${currentUser.email}`;
+    authInfo.style.display = "block";
+    saveDraftBtn.disabled = false;
+    publishBtn.disabled = false;
+    galleryBtn.style.display = "inline-block";
+  } else {
+    emailInput.style.display = "inline-block";
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+    authInfo.textContent = "";
+    authInfo.style.display = "none";
+    saveDraftBtn.disabled = true;
+    publishBtn.disabled = true;
+    galleryBtn.style.display = "none";
+  }
+}
+
+// ---------- dB → font size mapping ----------
 function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120) {
   if (maxDb === minDb) return minPx;
   
@@ -87,7 +139,7 @@ function amplitudeToDb(amplitude) {
   return amplitude <= 0 ? -80 : 20 * Math.log10(amplitude);
 }
 
-// ---------- Parse timestamped text format (time\nword\ntime\nword) ----------
+// ---------- Parse timestamped text format ----------
 function parseTimestampedText(text) {
   const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
   const result = [];
@@ -262,7 +314,7 @@ function getPitchForWord(start, end) {
   return pitches.length ? pitches.reduce((a, b) => a + b, 0) / pitches.length : null;
 }
 
-// ---------- dB to Color mapping (blue → red gradient, no yellow/green) ----------
+// ---------- dB to Color mapping ----------
 function dbToColor(db, minDb, maxDb) {
   if (maxDb === minDb) return 'rgb(100, 100, 255)';
   
@@ -384,7 +436,7 @@ function buildCreationPayload() {
   return {
     version: "1.0",
     duration: durationGlobal,
-    title: "TT2WW",
+    title: "TT2WW Creation",
     data: {
       words: currentRows,
       mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode },
@@ -402,47 +454,206 @@ async function captureOutputPngBlob() {
 
 // ---------- Save Creation to Supabase ----------
 async function saveCreation({ isPublic }) {
-  const session = (await supabase.auth.getSession()).data.session;
-  if (!session) return alert("Please log in first.");
+  if (!currentUser) {
+    alert("Please log in first.");
+    return;
+  }
 
-  const payload = buildCreationPayload();
-  const pngBlob = await captureOutputPngBlob();
+  if (!currentRows.length) {
+    alert("No data to save. Please generate first.");
+    return;
+  }
 
-  // 1) insert DB row first (so we get id)
-  const { data: created, error: insertErr } = await supabase
+  const status = document.getElementById("status");
+  status.textContent = "💾 Saving creation...";
+
+  try {
+    const payload = buildCreationPayload();
+    const pngBlob = await captureOutputPngBlob();
+
+    // 1) Insert database row
+    const { data: created, error: insertErr } = await supabase
+      .from("creations")
+      .insert({
+        user_id: currentUser.id,
+        title: payload.title,
+        is_public: isPublic,
+        data_json: payload
+      })
+      .select("id")
+      .single();
+
+    if (insertErr) throw insertErr;
+
+    const creationId = created.id;
+    const imagePath = `${currentUser.id}/${creationId}.png`;
+
+    // 2) Upload image to Storage
+    const { error: upErr } = await supabase
+      .storage
+      .from("tt2ww-images")
+      .upload(imagePath, pngBlob, { contentType: "image/png", upsert: true });
+
+    if (upErr) throw upErr;
+
+    // 3) Update row with image path
+    const { error: updErr } = await supabase
+      .from("creations")
+      .update({ image_path: imagePath })
+      .eq("id", creationId);
+
+    if (updErr) throw updErr;
+
+    const shareUrl = `${window.location.origin}/?c=${creationId}`;
+    status.textContent = `✅ Saved! ${isPublic ? 'Public' : 'Private'} creation created.`;
+    
+    // Show share link
+    showShareModal(shareUrl, isPublic);
+    
+  } catch (error) {
+    status.textContent = `❌ Save failed: ${error.message}`;
+    console.error("Save error:", error);
+  }
+}
+
+// ---------- Share Modal ----------
+function showShareModal(url, isPublic) {
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h2>✅ Creation Saved!</h2>
+      <p>${isPublic ? 'Your creation is now public and visible in the gallery.' : 'Your creation is saved privately.'}</p>
+      ${isPublic ? `
+        <div class="share-link">
+          <input type="text" value="${url}" readonly id="shareUrl">
+          <button onclick="copyShareLink()" class="btn">Copy Link</button>
+        </div>
+      ` : ''}
+      <button onclick="closeModal()" class="btn primary">Close</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+window.copyShareLink = function() {
+  const input = document.getElementById("shareUrl");
+  input.select();
+  document.execCommand("copy");
+  alert("Link copied to clipboard!");
+};
+
+window.closeModal = function() {
+  const modal = document.querySelector(".modal");
+  if (modal) modal.remove();
+};
+
+// ---------- Gallery View ----------
+async function showGallery() {
+  const modal = document.createElement("div");
+  modal.className = "modal gallery-modal";
+  modal.innerHTML = `
+    <div class="modal-content gallery-content">
+      <div class="gallery-header">
+        <h2>🎨 Public Creations</h2>
+        <button onclick="closeModal()" class="btn ghost">✕</button>
+      </div>
+      <div id="galleryGrid" class="gallery-grid">
+        <p>Loading...</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Fetch public creations
+  const { data, error } = await supabase
     .from("creations")
-    .insert({
-      user_id: session.user.id,
-      title: payload.title ?? "Untitled",
-      is_public: isPublic,
-      data_json: payload
-    })
-    .select("id")
+    .select("id, title, image_path, created_at, user_id")
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  const grid = document.getElementById("galleryGrid");
+  
+  if (error || !data || data.length === 0) {
+    grid.innerHTML = "<p>No public creations yet. Be the first to share!</p>";
+    return;
+  }
+
+  grid.innerHTML = "";
+  
+  for (const item of data) {
+    const card = document.createElement("div");
+    card.className = "gallery-card";
+    
+    // Get public URL for image
+    const { data: urlData } = supabase.storage
+      .from("tt2ww-images")
+      .getPublicUrl(item.image_path);
+    
+    const imageUrl = urlData?.publicUrl || "";
+    const date = new Date(item.created_at).toLocaleDateString();
+    
+    card.innerHTML = `
+      <img src="${imageUrl}" alt="${escapeHtml(item.title)}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22%3E%3Crect fill=%22%23333%22 width=%22200%22 height=%22150%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E'">
+      <div class="gallery-info">
+        <h3>${escapeHtml(item.title)}</h3>
+        <p>${date}</p>
+        <button onclick="loadCreation('${item.id}')" class="btn">View</button>
+      </div>
+    `;
+    
+    grid.appendChild(card);
+  }
+}
+
+window.loadCreation = async function(creationId) {
+  closeModal();
+  const url = new URL(window.location);
+  url.searchParams.set('c', creationId);
+  window.location = url.toString();
+};
+
+// ---------- Load Shared Creation ----------
+async function maybeLoadShared() {
+  const id = new URLSearchParams(window.location.search).get("c");
+  if (!id) return;
+
+  const status = document.getElementById("status");
+  status.textContent = "📥 Loading shared creation...";
+
+  const { data, error } = await supabase
+    .from("creations")
+    .select("data_json, image_path, is_public, title")
+    .eq("id", id)
     .single();
 
-  if (insertErr) return alert(insertErr.message);
+  if (error) {
+    status.textContent = `❌ Failed to load: ${error.message}`;
+    return;
+  }
 
-  const creationId = created.id;
-  const imagePath = `${session.user.id}/${creationId}.png`;
+  if (!data.is_public && (!currentUser || data.user_id !== currentUser.id)) {
+    status.textContent = "❌ This creation is private.";
+    return;
+  }
 
-  // 2) upload image to Storage
-  const { error: upErr } = await supabase
-    .storage
-    .from("tt2ww-images")
-    .upload(imagePath, pngBlob, { contentType: "image/png", upsert: true });
-
-  if (upErr) return alert(upErr.message);
-
-  // 3) save image_path on row
-  const { error: updErr } = await supabase
-    .from("creations")
-    .update({ image_path: imagePath })
-    .eq("id", creationId);
-
-  if (updErr) return alert(updErr.message);
-
-  const shareUrl = `${window.location.origin}/?c=${creationId}`;
-  alert(`Saved! Share link:\n${shareUrl}`);
+  // Re-render from JSON
+  const payload = data.data_json;
+  const minDb = payload.data.mapping.minDb || -60;
+  const maxDb = payload.data.mapping.maxDb || 0;
+  const mode = payload.data.mapping.mode || 'neutral';
+  
+  currentRows = payload.data.words;
+  renderWords(currentRows, minDb, maxDb, mode);
+  renderTable(currentRows, minDb, maxDb, mode);
+  
+  // Update controls
+  document.getElementById("minDb").value = minDb;
+  document.getElementById("maxDb").value = maxDb;
+  document.getElementById("mapMode").value = mode;
+  
+  status.textContent = `✅ Loaded: ${data.title}`;
 }
 
 // ---------- Main Machine Runner ----------
@@ -575,51 +786,31 @@ async function runMachine(){
   }
 }
 
-// ---------- Load Shared Creation ----------
-async function maybeLoadShared() {
-  const id = new URLSearchParams(window.location.search).get("c");
-  if (!id) return;
-
-  const { data, error } = await supabase
-    .from("creations")
-    .select("data_json, image_path, is_public")
-    .eq("id", id)
-    .single();
-
-  if (error) return alert(error.message);
-
-  // Re-render from JSON
-  const payload = data.data_json;
-  const minDb = payload.data.mapping.minDb || -60;
-  const maxDb = payload.data.mapping.maxDb || 0;
-  
-  currentRows = payload.data.words;
-  renderWords(currentRows, minDb, maxDb);
-  renderTable(currentRows, minDb, maxDb);
-  
-  document.getElementById("status").textContent = `✅ Loaded shared creation: ${payload.title}`;
-}
-
-maybeLoadShared();
-
-// ---------- Wire up events ----------
+// ---------- Event Listeners ----------
 document.getElementById("generateBtn").addEventListener("click", runMachine);
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const email = document.getElementById("emailInput").value.trim();
-  if (!email) return alert("Enter email");
+  if (!email) {
+    alert("Please enter your email address");
+    return;
+  }
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: window.location.origin }
   });
-  if (error) return alert(error.message);
-  alert("Check your email for the magic link.");
+  
+  if (error) {
+    alert(`Login error: ${error.message}`);
+    return;
+  }
+  
+  alert("✅ Check your email for the magic link!");
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   await supabase.auth.signOut();
-  alert("Logged out");
 });
 
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
@@ -677,5 +868,11 @@ document.getElementById("scrub").addEventListener("input", (e) => {
 
 document.getElementById("saveDraftBtn").addEventListener("click", () => saveCreation({ isPublic: false }));
 document.getElementById("publishBtn").addEventListener("click", () => saveCreation({ isPublic: true }));
+document.getElementById("galleryBtn").addEventListener("click", showGallery);
+
+// Initialize auth on page load
+initAuth().then(() => {
+  maybeLoadShared();
+});
 
 document.getElementById("status").textContent = "Upload a WAV file to begin.";
