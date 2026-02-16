@@ -5,7 +5,7 @@
 // ---------- Supabase Configuration ----------
 // IMPORTANT: Replace these with your actual Supabase credentials
 const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ACTUAL_ANON_KEY_HERE"; // Replace with real anon key from Supabase dashboard
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk"; 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRows = [];
