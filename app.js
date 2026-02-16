@@ -187,7 +187,7 @@ function makeTimestamps(words) {
   const n = words.length;
   if (n === 0) return [];
 
-  const DURATION = durationGlobal;
+  const DURATION = 300.0;
   const PAUSE_DURATION = 0.15;
   const PUNCTUATION = /[.,!?;:]$/;
   
@@ -331,13 +331,7 @@ function dbToColor(db, minDb, maxDb) {
 // ---------- Render ----------
 function renderWords(rows, minDb, maxDb, mode = 'neutral') {
   const container = document.getElementById("wordOutput");
-  
-  // Clear the container except for the legend
-  const legend = container.querySelector(".legend");
   container.innerHTML = "";
-  if (legend) {
-    container.appendChild(legend);
-  }
 
   rows.forEach((r, idx) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
@@ -655,7 +649,7 @@ async function maybeLoadShared() {
   status.textContent = `✅ Loaded: ${data.title}`;
 }
 
-// ---------- Main Machine Runner ----------
+// ---------- Main Machine Runner - EXACTLY LIKE YOUR ORIGINAL ----------
 async function runMachine(){
   const status = document.getElementById("status");
   const minDb = Number(document.getElementById("minDb").value);
@@ -812,50 +806,35 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   await supabase.auth.signOut();
 });
 
-document.getElementById("wavFileInput").addEventListener("change", async (e) => {
+document.getElementById("wavFileInput").addEventListener("click", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   
   const status = document.getElementById("status");
   status.classList.remove("flashing");
-  status.textContent = "⏳ Loading audio file...";
+  status.textContent = "Loading audio file...";
   
   try {
     const { duration } = await loadWavFile(file);
     
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
-        ? `❌ Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
-        : `❌ Invalid audio duration.`;
+        ? `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
+        : `Error: Invalid audio duration.`;
       audioBuffer = null;
       currentAudioFile = null;
-      durationGlobal = 300;
-      dbTimeline = [];
       document.getElementById("durationSec").value = "0";
       e.target.value = "";
       return;
     }
     
     currentAudioFile = file;
-    durationGlobal = duration;
     document.getElementById("durationSec").value = duration.toFixed(2);
-    
-    // Build the dB timeline immediately when file loads
-    const minDb = Number(document.getElementById("minDb").value);
-    const maxDb = Number(document.getElementById("maxDb").value);
-    status.textContent = "⏳ Analyzing audio amplitude...";
-    dbTimeline = buildDbTimeline(duration, minDb, maxDb);
-    
-    setScrubUI(duration);
-    
-    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s). Enter text and click Generate.`;
+    status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz). Click Generate.`;
   } catch (error) {
-    status.textContent = `❌ Error loading audio: ${error.message}`;
+    status.textContent = `Error loading audio file: ${error.message}`;
     console.error(error);
     audioBuffer = null;
-    currentAudioFile = null;
-    durationGlobal = 300;
-    dbTimeline = [];
     e.target.value = "";
   }
 });
