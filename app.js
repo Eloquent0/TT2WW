@@ -52,10 +52,10 @@ function updateAuthUI() {
     emailInput.style.display = "none";
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
-    authInfo.textContent = `Logged in: ${currentUser.email}`;
-    authInfo.style.display = "block";
-    saveDraftBtn.disabled = false;
-    publishBtn.disabled = false;
+    authInfo.textContent = `${currentUser.email}`;
+    authInfo.style.display = "inline-block";
+    if (saveDraftBtn) saveDraftBtn.disabled = false;
+    if (publishBtn) publishBtn.disabled = false;
     galleryBtn.style.display = "inline-block";
   } else {
     emailInput.style.display = "inline-block";
@@ -63,8 +63,8 @@ function updateAuthUI() {
     logoutBtn.style.display = "none";
     authInfo.textContent = "";
     authInfo.style.display = "none";
-    saveDraftBtn.disabled = true;
-    publishBtn.disabled = true;
+    if (saveDraftBtn) saveDraftBtn.disabled = true;
+    if (publishBtn) publishBtn.disabled = true;
     galleryBtn.style.display = "none";
   }
 }
@@ -330,7 +330,13 @@ function dbToColor(db, minDb, maxDb) {
 // ---------- Render ----------
 function renderWords(rows, minDb, maxDb, mode = 'neutral') {
   const container = document.getElementById("wordOutput");
+  
+  // Clear the container except for the legend
+  const legend = container.querySelector(".legend");
   container.innerHTML = "";
+  if (legend) {
+    container.appendChild(legend);
+  }
 
   rows.forEach((r, idx) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
