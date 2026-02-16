@@ -18,90 +18,42 @@ let currentUser = null;
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t){ return a + (b - a) * t; }
 
-// ---------- Auth State Management ----------
-async function initAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-  currentUser = session?.user || null;
-  updateAuthUI();
-
-  supabase.auth.onAuthStateChange((event, session) => {
-    currentUser = session?.user || null;
-    updateAuthUI();
-    
-    if (event === 'SIGNED_IN') {
-      document.getElementById("status").textContent = `✅ Logged in as ${currentUser.email}`;
-    } else if (event === 'SIGNED_OUT') {
-      document.getElementById("status").textContent = "Logged out successfully";
+// ---------- Audio Context Initialization ----------
+function getAudioContext() {
+  if (!audioContext) {
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.error("AudioContext creation failed:", e);
+      throw new Error("AudioContext not supported in this browser");
     }
-  });
-}
-
-function updateAuthUI() {
-  const emailInput = document.getElementById("emailInput");
-  const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const authInfo = document.getElementById("authInfo");
-  const saveDraftBtn = document.getElementById("saveDraftBtn");
-  const publishBtn = document.getElementById("publishBtn");
-  const galleryBtn = document.getElementById("galleryBtn");
-
-  if (currentUser) {
-    if (emailInput) emailInput.style.display = "none";
-    if (loginBtn) loginBtn.style.display = "none";
-    if (logoutBtn) logoutBtn.style.display = "inline-block";
-    if (authInfo) {
-      authInfo.textContent = currentUser.email;
-      authInfo.style.display = "inline-block";
-    }
-    if (saveDraftBtn) saveDraftBtn.disabled = false;
-    if (publishBtn) publishBtn.disabled = false;
-    if (galleryBtn) galleryBtn.style.display = "inline-block";
-  } else {
-    if (emailInput) emailInput.style.display = "inline-block";
-    if (loginBtn) loginBtn.style.display = "inline-block";
-    if (logoutBtn) logoutBtn.style.display = "none";
-    if (authInfo) {
-      authInfo.textContent = "";
-      authInfo.style.display = "none";
-    }
-    if (saveDraftBtn) saveDraftBtn.disabled = true;
-    if (publishBtn) publishBtn.disabled = true;
-    if (galleryBtn) galleryBtn.style.display = "none";
   }
-}
-
-// dB → font size mapping with different curve modes
-function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120) {
-  if (maxDb === minDb) return minPx;
-  
-  let t = clamp((db - minDb) / (maxDb - minDb), 0, 1);
-  
-  switch(mode) {
-    case 'peak':
-      t = Math.pow(t, 2.5);
-      break;
-    case 'silence':
-      t = Math.pow(t, 0.4);
-      break;
-  }
-  
-  return Math.round(lerp(minPx, maxPx, t));
-}
-
-function tokenize(text) {
-  return (text || "").trim().split(/\s+/).filter(Boolean);
+  return audioContext;
 }
 
 // ---------- WAV File Processing ----------
 async function loadWavFile(file) {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-
-  const arrayBuffer = await file.arrayBuffer();
-  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  if (!file) throw new Error("No file provided");
   
-  return { audioBuffer, sampleRate: audioBuffer.sampleRate, duration: audioBuffer.duration };
+  const ctx = getAudioContext();
+  const arrayBuffer = await file.arrayBuffer();
+  
+  try {
+    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    console.log("Audio decoded successfully:", {
+      duration: audioBuffer.duration,
+      sampleRate: audioBuffer.sampleRate,
+      channels: audioBuffer.numberOfChannels
+    });
+    return { 
+      audioBuffer, 
+      sampleRate: audioBuffer.sampleRate, 
+      duration: audioBuffer.duration 
+    };
+  } catch (e) {
+    console.error("Audio decode error:", e);
+    throw new Error(`Failed to decode audio: ${e.message}`);
+  }
 }
 
 // ---------- Transcription API Integration ----------
@@ -804,57 +756,82 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  if (!file) return;
-  
   const status = document.getElementById("status");
-  status.classList.remove("flashing");
+  
+  if (!file) {
+    status.textContent = "No file selected";
+    return;
+  }
+  
+  status.classList.add("flashing");
   status.textContent = "⏳ Loading audio file...";
   
   try {
-    console.log("File selected:", file.name, file.type, file.size);
+    console.log("=== FILE INPUT HANDLER ===");
+    console.log("File:", file.name, file.type, file.size);
     
+    // Load and decode audio
     const result = await loadWavFile(file);
-    const duration = audioBuffer.duration;
+    const duration = result.duration;
     
-    console.log("Audio duration:", duration);
+    console.log("Duration from audioBuffer:", duration);
     
-    if (duration > 300 || duration <= 0) {
-      status.textContent = duration > 300 
-        ? `❌ Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
-        : `❌ Error: Invalid audio duration.`;
+    // Validate duration
+    if (!Number.isFinite(duration) || duration <= 0) {
+      throw new Error(`Invalid audio duration: ${duration}`);
+    }
+    
+    const MAX_DURATION = 300.0;
+    if (duration > MAX_DURATION) {
+      status.textContent = `❌ Audio too long: ${duration.toFixed(2)}s (max 5 minutes / 300s)`;
+      status.classList.remove("flashing");
       audioBuffer = null;
       currentAudioFile = null;
       dbTimeline = [];
+      durationGlobal = 300;
       document.getElementById("durationSec").value = "0";
       e.target.value = "";
       return;
     }
     
+    // Set global state
     currentAudioFile = file;
     durationGlobal = duration;
     
-    // Build dB timeline
+    console.log("Set currentAudioFile and durationGlobal to:", duration);
+    
+    // Get dB range from inputs
     const minDb = Number(document.getElementById("minDb").value) || -60;
     const maxDb = Number(document.getElementById("maxDb").value) || 0;
     
+    console.log("Min dB:", minDb, "Max dB:", maxDb);
+    
+    // Build dB timeline
     status.textContent = "⏳ Analyzing audio amplitude...";
     dbTimeline = buildDbTimeline(duration, minDb, maxDb);
     
-    document.getElementById("durationSec").value = duration.toFixed(2);
+    console.log("Built dbTimeline with", dbTimeline.length, "samples");
+    if (dbTimeline.length > 0) {
+      console.log("First 5 samples:", dbTimeline.slice(0, 5));
+      console.log("Last 5 samples:", dbTimeline.slice(-5));
+    }
+    
+    // Update UI
+    const durationInput = document.getElementById("durationSec");
+    durationInput.value = duration.toFixed(2);
+    console.log("Set duration input to:", durationInput.value);
+    
     setScrubUI(duration);
     
-    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s). Paste transcript and click Generate.`;
-    
-    console.log("Audio loaded successfully:", {
-      duration,
-      samples: dbTimeline.length,
-      audioBuffer: !!audioBuffer,
-      currentAudioFile: !!currentAudioFile
-    });
+    status.classList.remove("flashing");
+    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s, ${dbTimeline.length} samples)`;
     
   } catch (error) {
-    status.textContent = `❌ Error loading audio file: ${error.message}`;
-    console.error("Audio load error:", error);
+    console.error("❌ Audio load error:", error);
+    status.classList.remove("flashing");
+    status.textContent = `❌ Error: ${error.message}`;
+    
+    // Reset state
     audioBuffer = null;
     currentAudioFile = null;
     dbTimeline = [];
@@ -893,4 +870,4 @@ initAuth().then(() => {
   maybeLoadShared();
 });
 
-document.getElementById("status").textContent = "Upload a WAV file to begin.";
+document.getElementById("status").textContent = "Upload an audio file to begin.";
