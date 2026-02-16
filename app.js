@@ -767,15 +767,16 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
   
   const status = document.getElementById("status");
   status.classList.remove("flashing");
-  status.textContent = "Loading audio file...";
+  status.textContent = "⏳ Loading audio file...";
   
   try {
+    // First load the audio buffer
     const { duration } = await loadWavFile(file);
     
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
-        ? `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
-        : `Error: Invalid audio duration.`;
+        ? `❌ Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
+        : `❌ Error: Invalid audio duration.`;
       audioBuffer = null;
       currentAudioFile = null;
       dbTimeline = [];
@@ -787,20 +788,24 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
     currentAudioFile = file;
     durationGlobal = duration;
     
-    // Build dB timeline from audio
+    // Now build dB timeline after audioBuffer is loaded
     const minDb = Number(document.getElementById("minDb").value) || -60;
     const maxDb = Number(document.getElementById("maxDb").value) || 0;
+    
+    status.textContent = "⏳ Analyzing audio amplitude...";
     dbTimeline = buildDbTimeline(duration, minDb, maxDb);
     
     setScrubUI(duration);
     
-    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s). Paste transcript and click Generate.`;
+    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s, ${dbTimeline.length} samples). Paste transcript and click Generate.`;
+    
   } catch (error) {
     status.textContent = `❌ Error loading audio file: ${error.message}`;
-    console.error(error);
+    console.error("Audio load error:", error);
     audioBuffer = null;
     currentAudioFile = null;
     dbTimeline = [];
+    durationGlobal = 300;
     e.target.value = "";
   }
 });
