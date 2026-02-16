@@ -665,130 +665,72 @@ async function maybeLoadShared() {
 // ---------- Main Machine Runner ----------
 async function runMachine(){
   const status = document.getElementById("status");
-  const minDb = Number(document.getElementById("minDb").value);
-  const maxDb = Number(document.getElementById("maxDb").value);
-  const mode = document.getElementById("mapMode").value;
-  const useTranscription = document.getElementById("useTranscription").checked;
+  status.textContent = "⏳ Processing...";
+  status.classList.add("flashing");
 
   try {
-    status.textContent = "🔍 Validating audio...";
-    
-    if (!audioBuffer) {
-      status.textContent = "❌ Please upload an audio file first.";
+    if (!currentAudioFile) {
+      alert("Please upload an audio/video file first.");
+      status.textContent = "❌ No file uploaded.";
+      status.classList.remove("flashing");
       return;
     }
 
-    const durationSec = audioBuffer.duration;
-    const MAX_DURATION = 300.0;
-
-    if (durationSec > MAX_DURATION) {
-      status.textContent = `❌ Audio must be 5 minutes or less. Your file is ${durationSec.toFixed(2)}s.`;
-      return;
-    }
-    
-    if (durationSec <= 0 || !(maxDb > minDb)) {
-      status.textContent = durationSec <= 0 ? "❌ Invalid audio duration." : "❌ Max dB must be greater than Min dB.";
+    const transcriptText = document.getElementById("transcriptInput").value.trim();
+    if (!transcriptText) {
+      alert("Please paste a transcript.");
+      status.textContent = "❌ No transcript provided.";
+      status.classList.remove("flashing");
       return;
     }
 
-    durationGlobal = durationSec;
+    const minDb = Number(document.getElementById("minDb").value);
+    const maxDb = Number(document.getElementById("maxDb").value);
+    const mode = document.getElementById("mapMode").value;
 
-    let wordRows;
+    // Parse transcript into words
+    const words = transcriptText.split(/\s+/).filter(w => w.length > 0);
     
-    if (useTranscription) {
-      if (!currentAudioFile) {
-        status.textContent = "❌ Audio file not available for transcription.";
-        return;
+    // Calculate timing for each word
+    const wordDuration = durationGlobal / words.length;
+    
+    currentRows = words.map((word, idx) => {
+      const startTime = idx * wordDuration;
+      const endTime = (idx + 1) * wordDuration;
+      
+      // Get dB values for this time range
+      const dbValues = [];
+      for (let t = startTime; t < endTime; t += 0.05) {
+        const db = getDbAtTime(t);
+        if (Number.isFinite(db)) dbValues.push(db);
       }
       
-      status.textContent = "🎙️ Uploading to transcription service...";
-      const transcriptionData = await uploadForTranscription(currentAudioFile);
+      const dbMean = dbValues.length > 0 
+        ? dbValues.reduce((a, b) => a + b, 0) / dbValues.length 
+        : -60;
+      const dbMax = dbValues.length > 0 ? Math.max(...dbValues) : -60;
       
-      if (!transcriptionData?.words?.length) {
-        status.textContent = "❌ No words received from transcription service.";
-        return;
-      }
-      
-      wordRows = transcriptionData.words.map(w => ({ word: w.word, start: w.start, end: w.end }));
-      status.textContent = `✅ Received ${wordRows.length} words from transcription service.`;
-      
-    } else {
-      const text = document.getElementById("textInput").value;
-      
-      if (!text.trim()){
-        status.textContent = "❌ Please enter text.";
-        return;
-      }
-      
-      const hasTimestamps = /^\d+:\d{2}/m.test(text);
-      
-      if (hasTimestamps) {
-        status.textContent = "📝 Parsing timestamped text...";
-        const timestampedSegments = parseTimestampedText(text);
-        
-        if (!timestampedSegments.length) {
-          status.textContent = "❌ No valid timestamps found.";
-          return;
-        }
-        
-        wordRows = timestampsToWordRows(timestampedSegments);
-        
-        if (!wordRows.length) {
-          status.textContent = "❌ No words found in timestamped text.";
-          return;
-        }
-        
-        status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
-      } else {
-        status.textContent = "📝 Tokenizing text...";
-        const words = tokenize(text);
-        
-        if (!words.length) {
-          status.textContent = "❌ No words found in text.";
-          return;
-        }
+      return {
+        word,
+        start: startTime,
+        end: endTime,
+        db: dbMean,
+        dbMean,
+        dbMax
+      };
+    });
 
-        status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
-        wordRows = makeTimestamps(words);
-      }
-    }
+    // Render the results
+    renderWords(currentRows, minDb, maxDb, mode);
+    renderTable(currentRows, minDb, maxDb);
 
-    if (!wordRows?.length) {
-      status.textContent = "❌ Failed to generate timestamps.";
-      return;
-    }
+    status.textContent = `✅ Generated ${currentRows.length} words!`;
+    status.classList.remove("flashing");
 
-    status.textContent = "🎵 Measuring dB from audio...";
-    dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
-    
-    if (!dbTimeline?.length) {
-      status.textContent = "❌ Failed to analyze audio.";
-      return;
-    }
-    
-    status.textContent = "📊 Mapping dB to words...";
-    const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb);
-    
-    if (!rows?.length) {
-      status.textContent = "❌ Failed to map dB values to words.";
-      return;
-    }
-
-    currentRows = rows;
-
-    status.textContent = "🎨 Rendering output...";
-    renderWords(rows, minDb, maxDb, mode);
-    renderTable(rows, minDb, maxDb, mode);
-    setScrubUI(durationSec);
-
-    document.getElementById("durationSec").value = durationSec.toFixed(2);
-
-    const source = useTranscription ? 'API transcription' : 'manual text';
-    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode} • Source: ${source}`;
-    
   } catch (error) {
     status.textContent = `❌ Error: ${error.message}`;
-    console.error("runMachine error:", error);
+    status.classList.remove("flashing");
+    console.error("Machine error:", error);
   }
 }
 
