@@ -4,7 +4,7 @@
 
 // ---------- Supabase Configuration ----------
 const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk";
+const SUPABASE_ANON_KEY = "sb_publishable_7fD-sfI8wb8IU8x-x1qALg_kZ0lHuJ4";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRows = [];
@@ -13,63 +13,16 @@ let durationGlobal = 300;
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
-let currentUser = null;
 
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t){ return a + (b - a) * t; }
 
-// ---------- Auth State Management ----------
-async function initAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-  currentUser = session?.user || null;
-  updateAuthUI();
-
-  supabase.auth.onAuthStateChange((event, session) => {
-    currentUser = session?.user || null;
-    updateAuthUI();
-  });
-}
-
-function updateAuthUI() {
-  const emailInput = document.getElementById("emailInput");
-  const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const authInfo = document.getElementById("authInfo");
-  const saveDraftBtn = document.getElementById("saveDraftBtn");
-  const publishBtn = document.getElementById("publishBtn");
-  const galleryBtn = document.getElementById("galleryBtn");
-
-  if (currentUser) {
-    if (emailInput) emailInput.style.display = "none";
-    if (loginBtn) loginBtn.style.display = "none";
-    if (logoutBtn) logoutBtn.style.display = "inline-block";
-    if (authInfo) {
-      authInfo.textContent = currentUser.email;
-      authInfo.style.display = "inline-block";
-    }
-    if (saveDraftBtn) saveDraftBtn.disabled = false;
-    if (publishBtn) publishBtn.disabled = false;
-    if (galleryBtn) galleryBtn.style.display = "inline-block";
-  } else {
-    if (emailInput) emailInput.style.display = "inline-block";
-    if (loginBtn) loginBtn.style.display = "inline-block";
-    if (logoutBtn) logoutBtn.style.display = "none";
-    if (authInfo) {
-      authInfo.textContent = "";
-      authInfo.style.display = "none";
-    }
-    if (saveDraftBtn) saveDraftBtn.disabled = true;
-    if (publishBtn) publishBtn.disabled = true;
-    if (galleryBtn) galleryBtn.style.display = "none";
-  }
-}
-
 // dB → font size mapping with different curve modes
 function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120) {
   if (maxDb === minDb) return minPx;
-  
+
   let t = clamp((db - minDb) / (maxDb - minDb), 0, 1);
-  
+
   switch(mode) {
     case 'peak':
       t = Math.pow(t, 2.5);
@@ -78,7 +31,7 @@ function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120
       t = Math.pow(t, 0.4);
       break;
   }
-  
+
   return Math.round(lerp(minPx, maxPx, t));
 }
 
@@ -94,7 +47,7 @@ async function loadWavFile(file) {
 
   const arrayBuffer = await file.arrayBuffer();
   audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  
+
   return { audioBuffer, sampleRate: audioBuffer.sampleRate, duration: audioBuffer.duration };
 }
 
@@ -102,31 +55,31 @@ async function loadWavFile(file) {
 async function uploadForTranscription(audioFile) {
   const formData = new FormData();
   formData.append('audio', audioFile);
-  
+
   const response = await fetch('http://localhost:5000/transcribe', {
     method: 'POST',
     body: formData
   });
-  
+
   if (!response.ok) {
     throw new Error(`Transcription failed: ${response.status} ${response.statusText}`);
   }
-  
+
   return await response.json();
 }
 
 function getAudioAmplitudeAtTime(time) {
   if (!audioBuffer) return 0;
-  
+
   const sampleIndex = Math.floor(time * audioBuffer.sampleRate);
   if (sampleIndex >= audioBuffer.length) return 0;
-  
+
   let sum = 0;
   for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
     const channelData = audioBuffer.getChannelData(channel);
     sum += Math.abs(channelData[sampleIndex] || 0);
   }
-  
+
   return sum / audioBuffer.numberOfChannels;
 }
 
@@ -138,42 +91,42 @@ function amplitudeToDb(amplitude) {
 function parseTimestampedText(text) {
   const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
   const result = [];
-  
+
   for (let i = 0; i < lines.length - 1; i += 2) {
     const timeMatch = lines[i].match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
     if (!timeMatch) continue;
-    
+
     const hours = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
     const minutes = parseInt(timeMatch[1], 10);
     const seconds = parseInt(timeMatch[2], 10);
     const startTime = hours * 3600 + minutes * 60 + seconds;
     const words = lines[i + 1].trim().split(/\s+/).filter(Boolean);
-    
+
     result.push({ time: startTime, text: lines[i + 1], words });
   }
-  
+
   return result;
 }
 
 function timestampsToWordRows(timestampedSegments) {
   const wordRows = [];
-  
+
   for (let i = 0; i < timestampedSegments.length; i++) {
     const segment = timestampedSegments[i];
     const nextSegment = timestampedSegments[i + 1];
-    
+
     const segmentStart = segment.time;
     const segmentEnd = nextSegment ? nextSegment.time : segmentStart + 2.0;
     const wordDuration = (segmentEnd - segmentStart) / segment.words.length;
-    
+
     if (segment.words.length === 0) continue;
-    
+
     for (let j = 0; j < segment.words.length; j++) {
       const start = segmentStart + (j * wordDuration);
       wordRows.push({ word: segment.words[j], start, end: start + wordDuration });
     }
   }
-  
+
   return wordRows;
 }
 
@@ -184,40 +137,40 @@ function makeTimestamps(words) {
   const DURATION = 300.0;
   const PAUSE_DURATION = 0.15;
   const PUNCTUATION = /[.,!?;:]$/;
-  
+
   let pauseCount = words.filter(word => PUNCTUATION.test(word)).length;
   const wordDur = (DURATION - (pauseCount * PAUSE_DURATION)) / n;
-  
+
   const rows = [];
   let currentTime = 0;
-  
+
   for (const word of words) {
     rows.push({ word, start: currentTime, end: currentTime + wordDur });
     currentTime += wordDur;
     if (PUNCTUATION.test(word)) currentTime += PAUSE_DURATION;
   }
-  
+
   return rows;
 }
 
 function assignDbToWords(wordRows, dbTimeline, minDb = -40, maxDb = -5) {
   const SILENCE_FLOOR = -60;
-  
+
   return wordRows.map(row => {
     const { start, end } = row;
     const pitchHz = getPitchForWord(start, end);
-    
+
     const samplesInRange = dbTimeline.filter(s => s.t >= start && s.t <= end);
     const validSamples = samplesInRange.filter(s => Number.isFinite(s.db));
-    
+
     if (validSamples.length === 0) {
       const clampedSilence = clamp(SILENCE_FLOOR, minDb, maxDb);
       return { ...row, db: clampedSilence, dbMean: clampedSilence, dbMax: clampedSilence, pitchHz };
     }
-    
+
     const dbMean = validSamples.reduce((sum, s) => sum + s.db, 0) / validSamples.length;
     const dbMax = Math.max(...validSamples.map(s => s.db));
-    
+
     return { 
       ...row, 
       db: clamp(dbMean, minDb, maxDb), 
@@ -234,7 +187,7 @@ function buildDbTimeline(durationSec, minDb, maxDb) {
 
   for (let t = 0; t <= durationSec + 1e-9; t += step){
     let db = minDb;
-    
+
     if (audioBuffer) {
       const amp = getAudioAmplitudeAtTime(t);
       db = clamp(amplitudeToDb(amp), minDb, maxDb);
@@ -312,13 +265,13 @@ function getPitchForWord(start, end) {
 // ---------- dB to Color mapping (blue → red gradient, no yellow/green) ----------
 function dbToColor(db, minDb, maxDb) {
   if (maxDb === minDb) return 'rgb(100, 100, 255)';
-  
+
   let t = clamp(Math.pow((db - minDb) / (maxDb - minDb), 0.6), 0, 1);
 
   const r = Math.round(100 + (155 * t));
   const g = Math.round(150 - (70 * t));
   const b = Math.round(255 - (175 * t));
-  
+
   return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -422,100 +375,75 @@ function getDbAtTime(t){
   return dbTimeline[idx].db;
 }
 
-// ---------- Build Creation Payload ----------
-function buildCreationPayload() {
-  const minDb = Number(document.getElementById("minDb").value);
-  const maxDb = Number(document.getElementById("maxDb").value);
-  const mode = document.getElementById("mapMode").value;
-  
-  return {
-    version: "1.0",
-    duration: durationGlobal,
-    title: "TT2WW",
-    data: {
-      words: currentRows,
-      mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode },
-      style: { outputBg: "#fff", outputText: "#000", font: "Arial" }
-    }
-  };
-}
 
-// ---------- Capture Output as PNG ----------
-async function captureOutputPngBlob() {
-  const node = document.getElementById("wordOutput");
-  const canvas = await html2canvas(node, { backgroundColor: "#ffffff", scale: 2 });
-  return await new Promise(res => canvas.toBlob(res, "image/png"));
-}
 
-// ---------- Save Creation to Supabase ----------
-async function saveCreation({ isPublic }) {
-  const session = (await supabase.auth.getSession()).data.session;
-  if (!session) return alert("Please log in first.");
 
-  const payload = buildCreationPayload();
-  const pngBlob = await captureOutputPngBlob();
 
-  // 1) insert DB row first (so we get id)
-  const { data: created, error: insertErr } = await supabase
-    .from("creations")
-    .insert({
-      user_id: session.user.id,
-      title: payload.title ?? "Untitled",
-      is_public: isPublic,
-      data_json: payload
-    })
-    .select("id")
-    .single();
 
-  if (insertErr) return alert(insertErr.message);
 
-  const creationId = created.id;
-  const imagePath = `${session.user.id}/${creationId}.png`;
 
-  // 2) upload image to Storage
-  const { error: upErr } = await supabase
-    .storage
-    .from("tt2ww-images")
-    .upload(imagePath, pngBlob, { contentType: "image/png", upsert: true });
 
-  if (upErr) return alert(upErr.message);
 
-  // 3) save image_path on row
-  const { error: updErr } = await supabase
-    .from("creations")
-    .update({ image_path: imagePath })
-    .eq("id", creationId);
 
-  if (updErr) return alert(updErr.message);
 
-  const shareUrl = `${window.location.origin}/?c=${creationId}`;
-  alert(`Saved! Share link:\n${shareUrl}`);
-}
 
-// ---------- Load Shared Creation ----------
-async function maybeLoadShared() {
-  const id = new URLSearchParams(window.location.search).get("c");
-  if (!id) return;
 
-  const { data, error } = await supabase
-    .from("creations")
-    .select("data_json, image_path, is_public")
-    .eq("id", id)
-    .single();
 
-  if (error) return alert(error.message);
 
-  // Re-render from JSON
-  const payload = data.data_json;
-  const minDb = payload.data.mapping.minDb || -60;
-  const maxDb = payload.data.mapping.maxDb || 0;
-  
-  currentRows = payload.data.words;
-  renderWords(currentRows, minDb, maxDb);
-  renderTable(currentRows, minDb, maxDb);
-  
-  document.getElementById("status").textContent = `✅ Loaded shared creation: ${payload.title}`;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ---------- Main Machine Runner ----------
 async function runMachine(){
@@ -527,7 +455,7 @@ async function runMachine(){
 
   try {
     status.textContent = "🔍 Validating audio...";
-    
+
     if (!audioBuffer) {
       status.textContent = "❌ Please upload an audio file first.";
       return;
@@ -540,7 +468,7 @@ async function runMachine(){
       status.textContent = `❌ Audio must be 5 minutes or less. Your file is ${durationSec.toFixed(2)}s.`;
       return;
     }
-    
+
     if (durationSec <= 0 || !(maxDb > minDb)) {
       status.textContent = durationSec <= 0 ? "❌ Invalid audio duration." : "❌ Max dB must be greater than Min dB.";
       return;
@@ -549,55 +477,55 @@ async function runMachine(){
     durationGlobal = durationSec;
 
     let wordRows;
-    
+
     if (useTranscription) {
       if (!currentAudioFile) {
         status.textContent = "❌ Audio file not available for transcription.";
         return;
       }
-      
+
       status.textContent = "🎙️ Uploading to transcription service...";
       const transcriptionData = await uploadForTranscription(currentAudioFile);
-      
+
       if (!transcriptionData?.words?.length) {
         status.textContent = "❌ No words received from transcription service.";
         return;
       }
-      
+
       wordRows = transcriptionData.words.map(w => ({ word: w.word, start: w.start, end: w.end }));
       status.textContent = `✅ Received ${wordRows.length} words from transcription service.`;
-      
+
     } else {
       const text = document.getElementById("textInput").value;
-      
+
       if (!text.trim()){
         status.textContent = "❌ Please enter text.";
         return;
       }
-      
+
       const hasTimestamps = /^\d+:\d{2}/m.test(text);
-      
+
       if (hasTimestamps) {
         status.textContent = "📝 Parsing timestamped text...";
         const timestampedSegments = parseTimestampedText(text);
-        
+
         if (!timestampedSegments.length) {
           status.textContent = "❌ No valid timestamps found.";
           return;
         }
-        
+
         wordRows = timestampsToWordRows(timestampedSegments);
-        
+
         if (!wordRows.length) {
           status.textContent = "❌ No words found in timestamped text.";
           return;
         }
-        
+
         status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
       } else {
         status.textContent = "📝 Tokenizing text...";
         const words = tokenize(text);
-        
+
         if (!words.length) {
           status.textContent = "❌ No words found in text.";
           return;
@@ -615,15 +543,15 @@ async function runMachine(){
 
     status.textContent = "🎵 Measuring dB from audio...";
     dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
-    
+
     if (!dbTimeline?.length) {
       status.textContent = "❌ Failed to analyze audio.";
       return;
     }
-    
+
     status.textContent = "📊 Mapping dB to words...";
     const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb);
-    
+
     if (!rows?.length) {
       status.textContent = "❌ Failed to map dB values to words.";
       return;
@@ -640,12 +568,39 @@ async function runMachine(){
 
     const source = useTranscription ? 'API transcription' : 'manual text';
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode} • Source: ${source}`;
-    
+
   } catch (error) {
     status.textContent = `❌ Error: ${error.message}`;
     console.error("runMachine error:", error);
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ---------- Wire up events ----------
 document.getElementById("generateBtn").addEventListener("click", runMachine);
@@ -670,14 +625,14 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  
+
   const status = document.getElementById("status");
   status.classList.remove("flashing");
   status.textContent = "Loading audio file...";
-  
+
   try {
     const { duration } = await loadWavFile(file);
-    
+
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
         ? `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
@@ -688,7 +643,7 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
       e.target.value = "";
       return;
     }
-    
+
     currentAudioFile = file;
     document.getElementById("durationSec").value = duration.toFixed(2);
     status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz). Click Generate.`;
@@ -720,16 +675,7 @@ document.getElementById("scrub").addEventListener("input", (e) => {
   document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : `— dB`;
 });
 
-document.getElementById("saveDraftBtn").addEventListener("click", () => saveCreation({ isPublic: false }));
-document.getElementById("publishBtn").addEventListener("click", () => saveCreation({ isPublic: true }));
-if (document.getElementById("galleryBtn")) {
-  document.getElementById("galleryBtn").addEventListener("click", async () => {
-    alert("Gallery feature - coming soon!");
-  });
-}
 
-// Init and load
-initAuth();
-maybeLoadShared();
+
 
 document.getElementById("status").textContent = "Upload a WAV file to begin.";

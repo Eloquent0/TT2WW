@@ -3,25 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>TT2WW - Word → dB Translation Machine</title>
+  <title>Word → dB Translation Machine</title>
   <link rel="stylesheet" href="./main.css" />
   <link rel="icon" type="image/png" href="Logo.png">
 </head>
 
 <body>
   <div class="app">
+    <nav class="tabs">
+      <ul>
+        <!-- Removed Explanation and About tabs -->
+      </ul>
+    </nav>
+
     <header class="topbar">
       <div>
         <h1 class="title">TT2WW</h1>
         <p class="sub">Word → dB Translation Machine</p>
-        <p class="sub">Upload audio/video to analyze amplitude and drive typographic size per word.</p>
+        <p class="sub">Upload a WAV file to analyze audio amplitude and drive typographic size per word.</p>
       </div>
       <div class="auth">
-        <span id="authInfo" class="auth-info"></span>
-        <input id="emailInput" class="input" placeholder="email@example.com" type="email">
+        <input id="emailInput" class="input" placeholder="email@example.com">
         <button id="loginBtn" class="btn">Login (Magic Link)</button>
-        <button id="galleryBtn" class="btn" style="display:none;">🎨 Gallery</button>
-        <button id="logoutBtn" class="btn ghost" style="display:none;">Logout</button>
+        <button id="logoutBtn" class="btn ghost">Logout</button>
       </div>
       <div class="badge">5:00</div>
     </header>
@@ -39,8 +43,15 @@
           <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*" class="input">
         </div>
 
-        <label class="label">Transcript (paste your text here)</label>
-        <textarea id="transcriptInput" class="textarea" rows="8" placeholder="Paste your transcript here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
+        <div class="field">
+          <label class="label">
+            <input type="checkbox" id="useTranscription">
+            Use transcription API (http://localhost:5000/transcribe)
+          </label>
+        </div>
+
+        <label class="label">Text (used if transcription is disabled)</label>
+        <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
         <div class="field">
           <label class="label">Mapping Mode (affects dB→size curve only)</label>
@@ -53,8 +64,8 @@
 
         <div class="row row3">
           <div class="field">
-            <label class="label">Duration (s) - from file</label>
-            <input id="durationSec" class="input" type="text" value="0" readonly style="background-color: rgba(0,0,0,0.3);">
+            <label class="label">Duration (s) - from WAV</label>
+            <input id="durationSec" class="input" type="number" value="0" readonly>
           </div>
           <div class="field">
             <label class="label">Min dB</label>
@@ -71,12 +82,7 @@
           <button id="downloadCsvBtn" class="btn">Download CSV</button>
         </div>
 
-        <div class="row row2 actions">
-          <button id="saveDraftBtn" class="btn" disabled>💾 Save Draft</button>
-          <button id="publishBtn" class="btn" disabled>🌍 Publish Public</button>
-        </div>
-
-        <p id="status" class="status flashing">Upload an audio/video file to begin.</p>
+        <p id="status" class="status flashing">Upload a WAV file to begin.</p>
       </div>
 
       <div class="card">
@@ -88,11 +94,11 @@
 
         <div id="wordOutput" class="output" aria-label="Generated typography output">
           <div class="legend">
-            <span class="legend-label">Volume → Size + Color:</span>
+            <span class="legend-label">Pitch (hue) + Volume (lightness):</span>
             <div class="legend-gradient"></div>
             <div class="legend-labels">
-              <span>Quiet / Small</span>
-              <span>Loud / Large</span>
+              <span>Low pitch / quiet</span>
+              <span>High pitch / loud</span>
             </div>
           </div>
         </div>
@@ -134,7 +140,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
   <script src="./app.js"></script>
 </body>
 </html>
