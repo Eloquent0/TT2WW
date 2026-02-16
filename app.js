@@ -778,18 +778,29 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
         : `Error: Invalid audio duration.`;
       audioBuffer = null;
       currentAudioFile = null;
-      document.getElementById("durationSec").value = "0";
+      dbTimeline = [];
+      durationGlobal = 300;
       e.target.value = "";
       return;
     }
     
     currentAudioFile = file;
-    document.getElementById("durationSec").value = duration.toFixed(2);
-    status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz). Click Generate.`;
+    durationGlobal = duration;
+    
+    // Build dB timeline from audio
+    const minDb = Number(document.getElementById("minDb").value) || -60;
+    const maxDb = Number(document.getElementById("maxDb").value) || 0;
+    dbTimeline = buildDbTimeline(duration, minDb, maxDb);
+    
+    setScrubUI(duration);
+    
+    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s). Paste transcript and click Generate.`;
   } catch (error) {
-    status.textContent = `Error loading audio file: ${error.message}`;
+    status.textContent = `❌ Error loading audio file: ${error.message}`;
     console.error(error);
     audioBuffer = null;
+    currentAudioFile = null;
+    dbTimeline = [];
     e.target.value = "";
   }
 });
