@@ -806,35 +806,64 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
   await supabase.auth.signOut();
 });
 
-document.getElementById("wavFileInput").addEventListener("click", async (e) => {
+document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   
   const status = document.getElementById("status");
   status.classList.remove("flashing");
-  status.textContent = "Loading audio file...";
+  status.textContent = "⏳ Loading audio file...";
   
   try {
-    const { duration } = await loadWavFile(file);
+    console.log("File selected:", file.name, file.type, file.size);
+    
+    const result = await loadWavFile(file);
+    const duration = audioBuffer.duration;
+    
+    console.log("Audio duration:", duration);
     
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
-        ? `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
-        : `Error: Invalid audio duration.`;
+        ? `❌ Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
+        : `❌ Error: Invalid audio duration.`;
       audioBuffer = null;
       currentAudioFile = null;
+      dbTimeline = [];
       document.getElementById("durationSec").value = "0";
       e.target.value = "";
       return;
     }
     
     currentAudioFile = file;
+    durationGlobal = duration;
+    
+    // Build dB timeline
+    const minDb = Number(document.getElementById("minDb").value) || -60;
+    const maxDb = Number(document.getElementById("maxDb").value) || 0;
+    
+    status.textContent = "⏳ Analyzing audio amplitude...";
+    dbTimeline = buildDbTimeline(duration, minDb, maxDb);
+    
     document.getElementById("durationSec").value = duration.toFixed(2);
-    status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz). Click Generate.`;
+    setScrubUI(duration);
+    
+    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s). Paste transcript and click Generate.`;
+    
+    console.log("Audio loaded successfully:", {
+      duration,
+      samples: dbTimeline.length,
+      audioBuffer: !!audioBuffer,
+      currentAudioFile: !!currentAudioFile
+    });
+    
   } catch (error) {
-    status.textContent = `Error loading audio file: ${error.message}`;
-    console.error(error);
+    status.textContent = `❌ Error loading audio file: ${error.message}`;
+    console.error("Audio load error:", error);
     audioBuffer = null;
+    currentAudioFile = null;
+    dbTimeline = [];
+    durationGlobal = 300;
+    document.getElementById("durationSec").value = "0";
     e.target.value = "";
   }
 });
