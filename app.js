@@ -649,19 +649,20 @@ async function maybeLoadShared() {
   status.textContent = `✅ Loaded: ${data.title}`;
 }
 
-// ---------- Main Machine Runner - EXACTLY LIKE YOUR ORIGINAL ----------
+// ---------- Main Machine Runner ----------
 async function runMachine(){
   const status = document.getElementById("status");
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
   const mode = document.getElementById("mapMode").value;
-  const useTranscription = document.getElementById("useTranscription").checked;
 
   try {
     status.textContent = "🔍 Validating audio...";
+    status.classList.add("flashing");
     
     if (!audioBuffer) {
       status.textContent = "❌ Please upload an audio file first.";
+      status.classList.remove("flashing");
       return;
     }
 
@@ -670,78 +671,66 @@ async function runMachine(){
 
     if (durationSec > MAX_DURATION) {
       status.textContent = `❌ Audio must be 5 minutes or less. Your file is ${durationSec.toFixed(2)}s.`;
+      status.classList.remove("flashing");
       return;
     }
     
     if (durationSec <= 0 || !(maxDb > minDb)) {
       status.textContent = durationSec <= 0 ? "❌ Invalid audio duration." : "❌ Max dB must be greater than Min dB.";
+      status.classList.remove("flashing");
       return;
     }
 
     durationGlobal = durationSec;
 
-    let wordRows;
+    // Get transcript from the correct field
+    const transcriptText = document.getElementById("transcriptInput").value.trim();
     
-    if (useTranscription) {
-      if (!currentAudioFile) {
-        status.textContent = "❌ Audio file not available for transcription.";
-        return;
-      }
-      
-      status.textContent = "🎙️ Uploading to transcription service...";
-      const transcriptionData = await uploadForTranscription(currentAudioFile);
-      
-      if (!transcriptionData?.words?.length) {
-        status.textContent = "❌ No words received from transcription service.";
-        return;
-      }
-      
-      wordRows = transcriptionData.words.map(w => ({ word: w.word, start: w.start, end: w.end }));
-      status.textContent = `✅ Received ${wordRows.length} words from transcription service.`;
-      
-    } else {
-      const text = document.getElementById("textInput").value;
-      
-      if (!text.trim()){
-        status.textContent = "❌ Please enter text.";
-        return;
-      }
-      
-      const hasTimestamps = /^\d+:\d{2}/m.test(text);
-      
-      if (hasTimestamps) {
-        status.textContent = "📝 Parsing timestamped text...";
-        const timestampedSegments = parseTimestampedText(text);
-        
-        if (!timestampedSegments.length) {
-          status.textContent = "❌ No valid timestamps found.";
-          return;
-        }
-        
-        wordRows = timestampsToWordRows(timestampedSegments);
-        
-        if (!wordRows.length) {
-          status.textContent = "❌ No words found in timestamped text.";
-          return;
-        }
-        
-        status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
-      } else {
-        status.textContent = "📝 Tokenizing text...";
-        const words = tokenize(text);
-        
-        if (!words.length) {
-          status.textContent = "❌ No words found in text.";
-          return;
-        }
+    if (!transcriptText) {
+      status.textContent = "❌ Please paste a transcript.";
+      status.classList.remove("flashing");
+      return;
+    }
 
-        status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
-        wordRows = makeTimestamps(words);
+    let wordRows;
+    const hasTimestamps = /^\d+:\d{2}/m.test(transcriptText);
+    
+    if (hasTimestamps) {
+      status.textContent = "📝 Parsing timestamped text...";
+      const timestampedSegments = parseTimestampedText(transcriptText);
+      
+      if (!timestampedSegments.length) {
+        status.textContent = "❌ No valid timestamps found.";
+        status.classList.remove("flashing");
+        return;
       }
+      
+      wordRows = timestampsToWordRows(timestampedSegments);
+      
+      if (!wordRows.length) {
+        status.textContent = "❌ No words found in timestamped text.";
+        status.classList.remove("flashing");
+        return;
+      }
+      
+      status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
+    } else {
+      status.textContent = "📝 Tokenizing text...";
+      const words = tokenize(transcriptText);
+      
+      if (!words.length) {
+        status.textContent = "❌ No words found in text.";
+        status.classList.remove("flashing");
+        return;
+      }
+
+      status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
+      wordRows = makeTimestamps(words);
     }
 
     if (!wordRows?.length) {
       status.textContent = "❌ Failed to generate timestamps.";
+      status.classList.remove("flashing");
       return;
     }
 
@@ -750,6 +739,7 @@ async function runMachine(){
     
     if (!dbTimeline?.length) {
       status.textContent = "❌ Failed to analyze audio.";
+      status.classList.remove("flashing");
       return;
     }
     
@@ -758,6 +748,7 @@ async function runMachine(){
     
     if (!rows?.length) {
       status.textContent = "❌ Failed to map dB values to words.";
+      status.classList.remove("flashing");
       return;
     }
 
@@ -770,11 +761,12 @@ async function runMachine(){
 
     document.getElementById("durationSec").value = durationSec.toFixed(2);
 
-    const source = useTranscription ? 'API transcription' : 'manual text';
-    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode} • Source: ${source}`;
+    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode}`;
+    status.classList.remove("flashing");
     
   } catch (error) {
     status.textContent = `❌ Error: ${error.message}`;
+    status.classList.remove("flashing");
     console.error("runMachine error:", error);
   }
 }
