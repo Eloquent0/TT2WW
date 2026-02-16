@@ -726,7 +726,7 @@ async function runMachine(){
 
     // Render the results
     renderWords(currentRows, minDb, maxDb, mode);
-    renderTable(currentRows, minDb, maxDb);
+    renderTable(currentRows, minDb, maxDb, mode);
 
     status.textContent = `✅ Generated ${currentRows.length} words!`;
     status.classList.remove("flashing");
