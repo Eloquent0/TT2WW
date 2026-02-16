@@ -812,35 +812,36 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
       currentAudioFile = null;
       dbTimeline = [];
       durationGlobal = 300;
+      document.getElementById("durationSec").value = "0";
       e.target.value = "";
       return;
     }
     
     currentAudioFile = file;
     durationGlobal = duration;
-    console.log("Set currentAudioFile and durationGlobal");
+    
+    // Update the duration display
+    document.getElementById("durationSec").value = duration.toFixed(2);
+    console.log("Set currentAudioFile and durationGlobal:", duration);
     
     // Build dB timeline
     const minDb = Number(document.getElementById("minDb").value) || -60;
     const maxDb = Number(document.getElementById("maxDb").value) || 0;
     
     status.textContent = "⏳ Analyzing audio amplitude...";
-    console.log("Building dB timeline...");
+    console.log("Building dB timeline with minDb:", minDb, "maxDb:", maxDb);
     dbTimeline = buildDbTimeline(duration, minDb, maxDb);
     console.log("Built dbTimeline with", dbTimeline.length, "samples");
+    
+    if (dbTimeline.length > 0) {
+      console.log("First sample:", dbTimeline[0]);
+      console.log("Last sample:", dbTimeline[dbTimeline.length - 1]);
+      console.log("Sample dB values:", dbTimeline.slice(0, 10).map(s => s.db));
+    }
     
     setScrubUI(duration);
     
     status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s, ${dbTimeline.length} samples). Paste transcript and click Generate.`;
-    
-    console.log("Audio loaded successfully:", {
-      duration,
-      samples: dbTimeline.length,
-      audioBuffer: !!audioBuffer,
-      currentAudioFile: !!currentAudioFile,
-      firstSample: dbTimeline[0],
-      lastSample: dbTimeline[dbTimeline.length - 1]
-    });
     
   } catch (error) {
     status.textContent = `❌ Error loading audio file: ${error.message}`;
@@ -850,6 +851,7 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
     currentAudioFile = null;
     dbTimeline = [];
     durationGlobal = 300;
+    document.getElementById("durationSec").value = "0";
     e.target.value = "";
   }
 });
