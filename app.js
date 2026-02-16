@@ -783,16 +783,26 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  if (!file) return;
+  console.log("File selected:", file);
+  
+  if (!file) {
+    console.log("No file selected");
+    return;
+  }
   
   const status = document.getElementById("status");
   status.classList.remove("flashing");
   status.textContent = "⏳ Loading audio file...";
   
   try {
+    console.log("Starting to load file:", file.name, file.type, file.size);
+    
     // Load the audio buffer
-    await loadWavFile(file);
+    const result = await loadWavFile(file);
+    console.log("loadWavFile result:", result);
+    
     const duration = audioBuffer.duration;
+    console.log("Audio duration:", duration);
     
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
@@ -808,13 +818,16 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
     
     currentAudioFile = file;
     durationGlobal = duration;
+    console.log("Set currentAudioFile and durationGlobal");
     
     // Build dB timeline
     const minDb = Number(document.getElementById("minDb").value) || -60;
     const maxDb = Number(document.getElementById("maxDb").value) || 0;
     
     status.textContent = "⏳ Analyzing audio amplitude...";
+    console.log("Building dB timeline...");
     dbTimeline = buildDbTimeline(duration, minDb, maxDb);
+    console.log("Built dbTimeline with", dbTimeline.length, "samples");
     
     setScrubUI(duration);
     
@@ -824,12 +837,15 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
       duration,
       samples: dbTimeline.length,
       audioBuffer: !!audioBuffer,
-      currentAudioFile: !!currentAudioFile
+      currentAudioFile: !!currentAudioFile,
+      firstSample: dbTimeline[0],
+      lastSample: dbTimeline[dbTimeline.length - 1]
     });
     
   } catch (error) {
     status.textContent = `❌ Error loading audio file: ${error.message}`;
     console.error("Audio load error:", error);
+    console.error("Error stack:", error.stack);
     audioBuffer = null;
     currentAudioFile = null;
     dbTimeline = [];
