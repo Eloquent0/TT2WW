@@ -4,7 +4,7 @@
 
 // ---------- Supabase Configuration ----------
 const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk"; 
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRows = [];
@@ -18,42 +18,84 @@ let currentUser = null;
 function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t){ return a + (b - a) * t; }
 
-// ---------- Audio Context Initialization ----------
-function getAudioContext() {
-  if (!audioContext) {
-    try {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) {
-      console.error("AudioContext creation failed:", e);
-      throw new Error("AudioContext not supported in this browser");
+// ---------- Auth State Management ----------
+async function initAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  currentUser = session?.user || null;
+  updateAuthUI();
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user || null;
+    updateAuthUI();
+  });
+}
+
+function updateAuthUI() {
+  const emailInput = document.getElementById("emailInput");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const authInfo = document.getElementById("authInfo");
+  const saveDraftBtn = document.getElementById("saveDraftBtn");
+  const publishBtn = document.getElementById("publishBtn");
+  const galleryBtn = document.getElementById("galleryBtn");
+
+  if (currentUser) {
+    if (emailInput) emailInput.style.display = "none";
+    if (loginBtn) loginBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "inline-block";
+    if (authInfo) {
+      authInfo.textContent = currentUser.email;
+      authInfo.style.display = "inline-block";
     }
+    if (saveDraftBtn) saveDraftBtn.disabled = false;
+    if (publishBtn) publishBtn.disabled = false;
+    if (galleryBtn) galleryBtn.style.display = "inline-block";
+  } else {
+    if (emailInput) emailInput.style.display = "inline-block";
+    if (loginBtn) loginBtn.style.display = "inline-block";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (authInfo) {
+      authInfo.textContent = "";
+      authInfo.style.display = "none";
+    }
+    if (saveDraftBtn) saveDraftBtn.disabled = true;
+    if (publishBtn) publishBtn.disabled = true;
+    if (galleryBtn) galleryBtn.style.display = "none";
   }
-  return audioContext;
+}
+
+// dB → font size mapping with different curve modes
+function mapDbToSize(db, minDb, maxDb, mode = 'neutral', minPx = 14, maxPx = 120) {
+  if (maxDb === minDb) return minPx;
+  
+  let t = clamp((db - minDb) / (maxDb - minDb), 0, 1);
+  
+  switch(mode) {
+    case 'peak':
+      t = Math.pow(t, 2.5);
+      break;
+    case 'silence':
+      t = Math.pow(t, 0.4);
+      break;
+  }
+  
+  return Math.round(lerp(minPx, maxPx, t));
+}
+
+function tokenize(text) {
+  return (text || "").trim().split(/\s+/).filter(Boolean);
 }
 
 // ---------- WAV File Processing ----------
 async function loadWavFile(file) {
-  if (!file) throw new Error("No file provided");
-  
-  const ctx = getAudioContext();
-  const arrayBuffer = await file.arrayBuffer();
-  
-  try {
-    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    console.log("Audio decoded successfully:", {
-      duration: audioBuffer.duration,
-      sampleRate: audioBuffer.sampleRate,
-      channels: audioBuffer.numberOfChannels
-    });
-    return { 
-      audioBuffer, 
-      sampleRate: audioBuffer.sampleRate, 
-      duration: audioBuffer.duration 
-    };
-  } catch (e) {
-    console.error("Audio decode error:", e);
-    throw new Error(`Failed to decode audio: ${e.message}`);
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
+
+  const arrayBuffer = await file.arrayBuffer();
+  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  
+  return { audioBuffer, sampleRate: audioBuffer.sampleRate, duration: audioBuffer.duration };
 }
 
 // ---------- Transcription API Integration ----------
@@ -283,11 +325,7 @@ function dbToColor(db, minDb, maxDb) {
 // ---------- Render ----------
 function renderWords(rows, minDb, maxDb, mode = 'neutral') {
   const container = document.getElementById("wordOutput");
-  const legend = container.querySelector(".legend");
-  
-  // Clear only the words, keep the legend
-  const words = container.querySelectorAll(".word");
-  words.forEach(w => w.remove());
+  container.innerHTML = "";
 
   rows.forEach((r, idx) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
@@ -393,7 +431,7 @@ function buildCreationPayload() {
   return {
     version: "1.0",
     duration: durationGlobal,
-    title: "TT2WW Creation",
+    title: "TT2WW",
     data: {
       words: currentRows,
       mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode },
@@ -411,198 +449,72 @@ async function captureOutputPngBlob() {
 
 // ---------- Save Creation to Supabase ----------
 async function saveCreation({ isPublic }) {
-  if (!currentUser) {
-    alert("Please log in first.");
-    return;
-  }
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session) return alert("Please log in first.");
 
-  if (!currentRows.length) {
-    alert("No data to save. Please generate first.");
-    return;
-  }
+  const payload = buildCreationPayload();
+  const pngBlob = await captureOutputPngBlob();
 
-  const status = document.getElementById("status");
-  status.textContent = "💾 Saving creation...";
-
-  try {
-    const payload = buildCreationPayload();
-    const pngBlob = await captureOutputPngBlob();
-
-    const { data: created, error: insertErr } = await supabase
-      .from("creations")
-      .insert({
-        user_id: currentUser.id,
-        title: payload.title,
-        is_public: isPublic,
-        data_json: payload
-      })
-      .select("id")
-      .single();
-
-    if (insertErr) throw insertErr;
-
-    const creationId = created.id;
-    const imagePath = `${currentUser.id}/${creationId}.png`;
-
-    const { error: upErr } = await supabase
-      .storage
-      .from("tt2ww-images")
-      .upload(imagePath, pngBlob, { contentType: "image/png", upsert: true });
-
-    if (upErr) throw upErr;
-
-    const { error: updErr } = await supabase
-      .from("creations")
-      .update({ image_path: imagePath })
-      .eq("id", creationId);
-
-    if (updErr) throw updErr;
-
-    const shareUrl = `${window.location.origin}${window.location.pathname}?c=${creationId}`;
-    status.textContent = `✅ Saved! ${isPublic ? 'Public' : 'Private'} creation created.`;
-    
-    showShareModal(shareUrl, isPublic);
-    
-  } catch (error) {
-    status.textContent = `❌ Save failed: ${error.message}`;
-    console.error("Save error:", error);
-  }
-}
-
-// ---------- Share Modal ----------
-function showShareModal(url, isPublic) {
-  const modal = document.createElement("div");
-  modal.className = "modal";
-  modal.innerHTML = `
-    <div class="modal-content">
-      <h2>✅ Creation Saved!</h2>
-      <p>${isPublic ? 'Your creation is now public and visible in the gallery.' : 'Your creation is saved privately.'}</p>
-      ${isPublic ? `
-        <div class="share-link">
-          <input type="text" value="${url}" readonly id="shareUrl">
-          <button onclick="copyShareLink()" class="btn">Copy Link</button>
-        </div>
-      ` : ''}
-      <button onclick="closeModal()" class="btn primary">Close</button>
-    </div>
-  `;
-  document.body.appendChild(modal);
-}
-
-window.copyShareLink = function() {
-  const input = document.getElementById("shareUrl");
-  input.select();
-  document.execCommand("copy");
-  alert("Link copied to clipboard!");
-};
-
-window.closeModal = function() {
-  const modal = document.querySelector(".modal");
-  if (modal) modal.remove();
-};
-
-// ---------- Gallery View ----------
-async function showGallery() {
-  const modal = document.createElement("div");
-  modal.className = "modal gallery-modal";
-  modal.innerHTML = `
-    <div class="modal-content gallery-content">
-      <div class="gallery-header">
-        <h2>🎨 Public Creations</h2>
-        <button onclick="closeModal()" class="btn ghost">✕</button>
-      </div>
-      <div id="galleryGrid" class="gallery-grid">
-        <p>Loading...</p>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  const { data, error } = await supabase
+  // 1) insert DB row first (so we get id)
+  const { data: created, error: insertErr } = await supabase
     .from("creations")
-    .select("id, title, image_path, created_at, user_id")
-    .eq("is_public", true)
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .insert({
+      user_id: session.user.id,
+      title: payload.title ?? "Untitled",
+      is_public: isPublic,
+      data_json: payload
+    })
+    .select("id")
+    .single();
 
-  const grid = document.getElementById("galleryGrid");
-  
-  if (error || !data || data.length === 0) {
-    grid.innerHTML = "<p>No public creations yet. Be the first to share!</p>";
-    return;
-  }
+  if (insertErr) return alert(insertErr.message);
 
-  grid.innerHTML = "";
-  
-  for (const item of data) {
-    const card = document.createElement("div");
-    card.className = "gallery-card";
-    
-    const { data: urlData } = supabase.storage
-      .from("tt2ww-images")
-      .getPublicUrl(item.image_path);
-    
-    const imageUrl = urlData?.publicUrl || "";
-    const date = new Date(item.created_at).toLocaleDateString();
-    
-    card.innerHTML = `
-      <img src="${imageUrl}" alt="${escapeHtml(item.title)}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22%3E%3Crect fill=%22%23333%22 width=%22200%22 height=%22150%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23999%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E'">
-      <div class="gallery-info">
-        <h3>${escapeHtml(item.title)}</h3>
-        <p>${date}</p>
-        <button onclick="loadCreation('${item.id}')" class="btn">View</button>
-      </div>
-    `;
-    
-    grid.appendChild(card);
-  }
+  const creationId = created.id;
+  const imagePath = `${session.user.id}/${creationId}.png`;
+
+  // 2) upload image to Storage
+  const { error: upErr } = await supabase
+    .storage
+    .from("tt2ww-images")
+    .upload(imagePath, pngBlob, { contentType: "image/png", upsert: true });
+
+  if (upErr) return alert(upErr.message);
+
+  // 3) save image_path on row
+  const { error: updErr } = await supabase
+    .from("creations")
+    .update({ image_path: imagePath })
+    .eq("id", creationId);
+
+  if (updErr) return alert(updErr.message);
+
+  const shareUrl = `${window.location.origin}/?c=${creationId}`;
+  alert(`Saved! Share link:\n${shareUrl}`);
 }
-
-window.loadCreation = async function(creationId) {
-  closeModal();
-  const url = new URL(window.location);
-  url.searchParams.set('c', creationId);
-  window.location = url.toString();
-};
 
 // ---------- Load Shared Creation ----------
 async function maybeLoadShared() {
   const id = new URLSearchParams(window.location.search).get("c");
   if (!id) return;
 
-  const status = document.getElementById("status");
-  status.textContent = "📥 Loading shared creation...";
-
   const { data, error } = await supabase
     .from("creations")
-    .select("data_json, image_path, is_public, title, user_id")
+    .select("data_json, image_path, is_public")
     .eq("id", id)
     .single();
 
-  if (error) {
-    status.textContent = `❌ Failed to load: ${error.message}`;
-    return;
-  }
+  if (error) return alert(error.message);
 
-  if (!data.is_public && (!currentUser || data.user_id !== currentUser.id)) {
-    status.textContent = "❌ This creation is private.";
-    return;
-  }
-
+  // Re-render from JSON
   const payload = data.data_json;
   const minDb = payload.data.mapping.minDb || -60;
   const maxDb = payload.data.mapping.maxDb || 0;
-  const mode = payload.data.mapping.mode || 'neutral';
   
   currentRows = payload.data.words;
-  renderWords(currentRows, minDb, maxDb, mode);
-  renderTable(currentRows, minDb, maxDb, mode);
+  renderWords(currentRows, minDb, maxDb);
+  renderTable(currentRows, minDb, maxDb);
   
-  document.getElementById("minDb").value = minDb;
-  document.getElementById("maxDb").value = maxDb;
-  document.getElementById("mapMode").value = mode;
-  
-  status.textContent = `✅ Loaded: ${data.title}`;
+  document.getElementById("status").textContent = `✅ Loaded shared creation: ${payload.title}`;
 }
 
 // ---------- Main Machine Runner ----------
@@ -611,14 +523,13 @@ async function runMachine(){
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
   const mode = document.getElementById("mapMode").value;
+  const useTranscription = document.getElementById("useTranscription").checked;
 
   try {
     status.textContent = "🔍 Validating audio...";
-    status.classList.add("flashing");
     
     if (!audioBuffer) {
       status.textContent = "❌ Please upload an audio file first.";
-      status.classList.remove("flashing");
       return;
     }
 
@@ -627,66 +538,78 @@ async function runMachine(){
 
     if (durationSec > MAX_DURATION) {
       status.textContent = `❌ Audio must be 5 minutes or less. Your file is ${durationSec.toFixed(2)}s.`;
-      status.classList.remove("flashing");
       return;
     }
     
     if (durationSec <= 0 || !(maxDb > minDb)) {
       status.textContent = durationSec <= 0 ? "❌ Invalid audio duration." : "❌ Max dB must be greater than Min dB.";
-      status.classList.remove("flashing");
       return;
     }
 
     durationGlobal = durationSec;
 
-    // Get transcript from the correct field
-    const transcriptText = document.getElementById("transcriptInput").value.trim();
-    
-    if (!transcriptText) {
-      status.textContent = "❌ Please paste a transcript.";
-      status.classList.remove("flashing");
-      return;
-    }
-
     let wordRows;
-    const hasTimestamps = /^\d+:\d{2}/m.test(transcriptText);
     
-    if (hasTimestamps) {
-      status.textContent = "📝 Parsing timestamped text...";
-      const timestampedSegments = parseTimestampedText(transcriptText);
-      
-      if (!timestampedSegments.length) {
-        status.textContent = "❌ No valid timestamps found.";
-        status.classList.remove("flashing");
+    if (useTranscription) {
+      if (!currentAudioFile) {
+        status.textContent = "❌ Audio file not available for transcription.";
         return;
       }
       
-      wordRows = timestampsToWordRows(timestampedSegments);
+      status.textContent = "🎙️ Uploading to transcription service...";
+      const transcriptionData = await uploadForTranscription(currentAudioFile);
       
-      if (!wordRows.length) {
-        status.textContent = "❌ No words found in timestamped text.";
-        status.classList.remove("flashing");
+      if (!transcriptionData?.words?.length) {
+        status.textContent = "❌ No words received from transcription service.";
         return;
       }
       
-      status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
+      wordRows = transcriptionData.words.map(w => ({ word: w.word, start: w.start, end: w.end }));
+      status.textContent = `✅ Received ${wordRows.length} words from transcription service.`;
+      
     } else {
-      status.textContent = "📝 Tokenizing text...";
-      const words = tokenize(transcriptText);
+      const text = document.getElementById("textInput").value;
       
-      if (!words.length) {
-        status.textContent = "❌ No words found in text.";
-        status.classList.remove("flashing");
+      if (!text.trim()){
+        status.textContent = "❌ Please enter text.";
         return;
       }
+      
+      const hasTimestamps = /^\d+:\d{2}/m.test(text);
+      
+      if (hasTimestamps) {
+        status.textContent = "📝 Parsing timestamped text...";
+        const timestampedSegments = parseTimestampedText(text);
+        
+        if (!timestampedSegments.length) {
+          status.textContent = "❌ No valid timestamps found.";
+          return;
+        }
+        
+        wordRows = timestampsToWordRows(timestampedSegments);
+        
+        if (!wordRows.length) {
+          status.textContent = "❌ No words found in timestamped text.";
+          return;
+        }
+        
+        status.textContent = `✅ Parsed ${wordRows.length} words from ${timestampedSegments.length} timestamped segments.`;
+      } else {
+        status.textContent = "📝 Tokenizing text...";
+        const words = tokenize(text);
+        
+        if (!words.length) {
+          status.textContent = "❌ No words found in text.";
+          return;
+        }
 
-      status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
-      wordRows = makeTimestamps(words);
+        status.textContent = `⏱️ Generating timestamps for ${words.length} words...`;
+        wordRows = makeTimestamps(words);
+      }
     }
 
     if (!wordRows?.length) {
       status.textContent = "❌ Failed to generate timestamps.";
-      status.classList.remove("flashing");
       return;
     }
 
@@ -695,7 +618,6 @@ async function runMachine(){
     
     if (!dbTimeline?.length) {
       status.textContent = "❌ Failed to analyze audio.";
-      status.classList.remove("flashing");
       return;
     }
     
@@ -704,7 +626,6 @@ async function runMachine(){
     
     if (!rows?.length) {
       status.textContent = "❌ Failed to map dB values to words.";
-      status.classList.remove("flashing");
       return;
     }
 
@@ -717,126 +638,64 @@ async function runMachine(){
 
     document.getElementById("durationSec").value = durationSec.toFixed(2);
 
-    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode}`;
-    status.classList.remove("flashing");
+    const source = useTranscription ? 'API transcription' : 'manual text';
+    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s • Mode: ${mode} • Source: ${source}`;
     
   } catch (error) {
     status.textContent = `❌ Error: ${error.message}`;
-    status.classList.remove("flashing");
     console.error("runMachine error:", error);
   }
 }
 
-// ---------- Event Listeners ----------
+// ---------- Wire up events ----------
 document.getElementById("generateBtn").addEventListener("click", runMachine);
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const email = document.getElementById("emailInput").value.trim();
-  if (!email) {
-    alert("Please enter your email address");
-    return;
-  }
+  if (!email) return alert("Enter email");
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: window.location.origin }
   });
-  
-  if (error) {
-    alert(`Login error: ${error.message}`);
-    return;
-  }
-  
-  alert("✅ Check your email for the magic link!");
+  if (error) return alert(error.message);
+  alert("Check your email for the magic link.");
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   await supabase.auth.signOut();
+  alert("Logged out");
 });
 
 document.getElementById("wavFileInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
+  if (!file) return;
+  
   const status = document.getElementById("status");
-  
-  if (!file) {
-    status.textContent = "No file selected";
-    return;
-  }
-  
-  status.classList.add("flashing");
-  status.textContent = "⏳ Loading audio file...";
+  status.classList.remove("flashing");
+  status.textContent = "Loading audio file...";
   
   try {
-    console.log("=== FILE INPUT HANDLER ===");
-    console.log("File:", file.name, file.type, file.size);
+    const { duration } = await loadWavFile(file);
     
-    // Load and decode audio
-    const result = await loadWavFile(file);
-    const duration = result.duration;
-    
-    console.log("Duration from audioBuffer:", duration);
-    
-    // Validate duration
-    if (!Number.isFinite(duration) || duration <= 0) {
-      throw new Error(`Invalid audio duration: ${duration}`);
-    }
-    
-    const MAX_DURATION = 300.0;
-    if (duration > MAX_DURATION) {
-      status.textContent = `❌ Audio too long: ${duration.toFixed(2)}s (max 5 minutes / 300s)`;
-      status.classList.remove("flashing");
+    if (duration > 300 || duration <= 0) {
+      status.textContent = duration > 300 
+        ? `Error: Audio must be 5 minutes or less. Your file is ${duration.toFixed(2)}s.`
+        : `Error: Invalid audio duration.`;
       audioBuffer = null;
       currentAudioFile = null;
-      dbTimeline = [];
-      durationGlobal = 300;
       document.getElementById("durationSec").value = "0";
       e.target.value = "";
       return;
     }
     
-    // Set global state
     currentAudioFile = file;
-    durationGlobal = duration;
-    
-    console.log("Set currentAudioFile and durationGlobal to:", duration);
-    
-    // Get dB range from inputs
-    const minDb = Number(document.getElementById("minDb").value) || -60;
-    const maxDb = Number(document.getElementById("maxDb").value) || 0;
-    
-    console.log("Min dB:", minDb, "Max dB:", maxDb);
-    
-    // Build dB timeline
-    status.textContent = "⏳ Analyzing audio amplitude...";
-    dbTimeline = buildDbTimeline(duration, minDb, maxDb);
-    
-    console.log("Built dbTimeline with", dbTimeline.length, "samples");
-    if (dbTimeline.length > 0) {
-      console.log("First 5 samples:", dbTimeline.slice(0, 5));
-      console.log("Last 5 samples:", dbTimeline.slice(-5));
-    }
-    
-    // Update UI
-    const durationInput = document.getElementById("durationSec");
-    durationInput.value = duration.toFixed(2);
-    console.log("Set duration input to:", durationInput.value);
-    
-    setScrubUI(duration);
-    
-    status.classList.remove("flashing");
-    status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s, ${dbTimeline.length} samples)`;
-    
+    document.getElementById("durationSec").value = duration.toFixed(2);
+    status.textContent = `Audio file loaded: ${file.name} (${duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz). Click Generate.`;
   } catch (error) {
-    console.error("❌ Audio load error:", error);
-    status.classList.remove("flashing");
-    status.textContent = `❌ Error: ${error.message}`;
-    
-    // Reset state
+    status.textContent = `Error loading audio file: ${error.message}`;
+    console.error(error);
     audioBuffer = null;
-    currentAudioFile = null;
-    dbTimeline = [];
-    durationGlobal = 300;
-    document.getElementById("durationSec").value = "0";
     e.target.value = "";
   }
 });
@@ -863,11 +722,14 @@ document.getElementById("scrub").addEventListener("input", (e) => {
 
 document.getElementById("saveDraftBtn").addEventListener("click", () => saveCreation({ isPublic: false }));
 document.getElementById("publishBtn").addEventListener("click", () => saveCreation({ isPublic: true }));
-document.getElementById("galleryBtn").addEventListener("click", showGallery);
+if (document.getElementById("galleryBtn")) {
+  document.getElementById("galleryBtn").addEventListener("click", async () => {
+    alert("Gallery feature - coming soon!");
+  });
+}
 
-// Initialize auth on page load
-initAuth().then(() => {
-  maybeLoadShared();
-});
+// Init and load
+initAuth();
+maybeLoadShared();
 
-document.getElementById("status").textContent = "Upload an audio file to begin.";
+document.getElementById("status").textContent = "Upload a WAV file to begin.";
