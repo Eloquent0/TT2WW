@@ -331,7 +331,11 @@ function dbToColor(db, minDb, maxDb) {
 // ---------- Render ----------
 function renderWords(rows, minDb, maxDb, mode = 'neutral') {
   const container = document.getElementById("wordOutput");
-  container.innerHTML = "";
+  const legend = container.querySelector(".legend");
+  
+  // Clear only the words, keep the legend
+  const words = container.querySelectorAll(".word");
+  words.forEach(w => w.remove());
 
   rows.forEach((r, idx) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);

@@ -39,15 +39,8 @@
           <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*" class="input">
         </div>
 
-        <div class="field">
-          <label class="label">
-            <input type="checkbox" id="useTranscription">
-            Use transcription API (http://localhost:5000/transcribe)
-          </label>
-        </div>
-
-        <label class="label">Text (type or paste your transcript)</label>
-        <textarea id="textInput" class="textarea" rows="8" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
+        <label class="label">Transcript (paste your text here)</label>
+        <textarea id="transcriptInput" class="textarea" rows="8" placeholder="Paste your transcript here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
         <div class="field">
           <label class="label">Mapping Mode (affects dB→size curve only)</label>
