@@ -49,23 +49,27 @@ function updateAuthUI() {
   const galleryBtn = document.getElementById("galleryBtn");
 
   if (currentUser) {
-    emailInput.style.display = "none";
-    loginBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-    authInfo.textContent = `${currentUser.email}`;
-    authInfo.style.display = "inline-block";
+    if (emailInput) emailInput.style.display = "none";
+    if (loginBtn) loginBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "inline-block";
+    if (authInfo) {
+      authInfo.textContent = currentUser.email;
+      authInfo.style.display = "inline-block";
+    }
     if (saveDraftBtn) saveDraftBtn.disabled = false;
     if (publishBtn) publishBtn.disabled = false;
-    galleryBtn.style.display = "inline-block";
+    if (galleryBtn) galleryBtn.style.display = "inline-block";
   } else {
-    emailInput.style.display = "inline-block";
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-    authInfo.textContent = "";
-    authInfo.style.display = "none";
+    if (emailInput) emailInput.style.display = "inline-block";
+    if (loginBtn) loginBtn.style.display = "inline-block";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (authInfo) {
+      authInfo.textContent = "";
+      authInfo.style.display = "none";
+    }
     if (saveDraftBtn) saveDraftBtn.disabled = true;
     if (publishBtn) publishBtn.disabled = true;
-    galleryBtn.style.display = "none";
+    if (galleryBtn) galleryBtn.style.display = "none";
   }
 }
 
