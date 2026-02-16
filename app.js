@@ -102,9 +102,14 @@ async function loadWavFile(file) {
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  audioBuffer = decodedBuffer;
   
-  return { audioBuffer, sampleRate: audioBuffer.sampleRate, duration: audioBuffer.duration };
+  return { 
+    audioBuffer: decodedBuffer, 
+    sampleRate: decodedBuffer.sampleRate, 
+    duration: decodedBuffer.duration 
+  };
 }
 
 // ---------- Transcription API Integration ----------
@@ -672,8 +677,14 @@ async function runMachine(){
   status.textContent = "⏳ Processing...";
   status.classList.add("flashing");
 
+  console.log("runMachine called:", {
+    audioBuffer: !!audioBuffer,
+    currentAudioFile: !!currentAudioFile,
+    dbTimelineLength: dbTimeline.length
+  });
+
   try {
-    if (!currentAudioFile) {
+    if (!audioBuffer || !currentAudioFile) {
       alert("Please upload an audio/video file first.");
       status.textContent = "❌ No file uploaded.";
       status.classList.remove("flashing");
@@ -697,6 +708,8 @@ async function runMachine(){
     
     // Calculate timing for each word
     const wordDuration = durationGlobal / words.length;
+    
+    status.textContent = "📊 Mapping dB to words...";
     
     currentRows = words.map((word, idx) => {
       const startTime = idx * wordDuration;
@@ -724,7 +737,10 @@ async function runMachine(){
       };
     });
 
+    console.log("Generated rows:", currentRows.length);
+
     // Render the results
+    status.textContent = "🎨 Rendering output...";
     renderWords(currentRows, minDb, maxDb, mode);
     renderTable(currentRows, minDb, maxDb, mode);
 
@@ -774,8 +790,9 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
   status.textContent = "⏳ Loading audio file...";
   
   try {
-    // First load the audio buffer
-    const { duration } = await loadWavFile(file);
+    // Load the audio buffer
+    await loadWavFile(file);
+    const duration = audioBuffer.duration;
     
     if (duration > 300 || duration <= 0) {
       status.textContent = duration > 300 
@@ -792,7 +809,7 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
     currentAudioFile = file;
     durationGlobal = duration;
     
-    // Now build dB timeline after audioBuffer is loaded
+    // Build dB timeline
     const minDb = Number(document.getElementById("minDb").value) || -60;
     const maxDb = Number(document.getElementById("maxDb").value) || 0;
     
@@ -802,6 +819,13 @@ document.getElementById("wavFileInput").addEventListener("change", async (e) => 
     setScrubUI(duration);
     
     status.textContent = `✅ Audio loaded: ${file.name} (${duration.toFixed(2)}s, ${dbTimeline.length} samples). Paste transcript and click Generate.`;
+    
+    console.log("Audio loaded successfully:", {
+      duration,
+      samples: dbTimeline.length,
+      audioBuffer: !!audioBuffer,
+      currentAudioFile: !!currentAudioFile
+    });
     
   } catch (error) {
     status.textContent = `❌ Error loading audio file: ${error.message}`;
