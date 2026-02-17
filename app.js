@@ -1,11 +1,3 @@
-console.log("✅ app.js loaded");
-
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("✅ DOMContentLoaded fired");
-  console.log("wavFileInput =", document.getElementById("wavFileInput"));
-  console.log("durationSec  =", document.getElementById("durationSec"));
-});
-
 // =============================
 // TT2WW — Word → dB Translation Machine (Audio File Input)
 // =============================
@@ -303,6 +295,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  // ---------- DOM wiring ----------
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("✅ DOMContentLoaded");
+
+  const status = document.getElementById("status");
+  const fileInput = document.getElementById("wavFileInput");
+  const generateBtn = document.getElementById("generateBtn");
+  const downloadBtn = document.getElementById("downloadCsvBtn");
+  const scrub = document.getElementById("scrub");
+
+  if (!fileInput) {
+    console.error("❌ Missing #wavFileInput in HTML");
+    if (status) status.textContent = "❌ Missing file input (#wavFileInput).";
+    return;
+  }
+
   // File upload: decode audio and update duration field
   fileInput.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
@@ -335,6 +343,37 @@ document.addEventListener("DOMContentLoaded", () => {
       e.target.value = "";
     }
   });
+
+  // Generate button
+  if (generateBtn) generateBtn.addEventListener("click", runMachine);
+
+  // Download CSV
+  if (downloadBtn) {
+    downloadBtn.addEventListener("click", () => {
+      const minDb = Number(document.getElementById("minDb").value);
+      const maxDb = Number(document.getElementById("maxDb").value);
+      const mode = document.getElementById("mapMode")?.value || "neutral";
+
+      if (!currentRows.length) {
+        if (status) status.textContent = "Nothing to download yet — click Generate first.";
+        return;
+      }
+      downloadTextFile("generated_word_db_data.csv", rowsToCsv(currentRows, minDb, maxDb, mode), "text/csv");
+    });
+  }
+
+  // Scrub
+  if (scrub) {
+    scrub.addEventListener("input", (e) => {
+      const t = Number(e.target.value);
+      document.getElementById("scrubTime").textContent = `${t.toFixed(2)}s`;
+      const db = getDbAtTime(t);
+      document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : `— dB`;
+    });
+  }
+
+  if (status) status.textContent = "Upload an audio file to begin.";
+});
 
   // Generate button
   if (generateBtn) generateBtn.addEventListener("click", runMachine);
