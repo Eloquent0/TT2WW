@@ -374,34 +374,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (status) status.textContent = "Upload an audio file to begin.";
 });
-
-  // Generate button
-  if (generateBtn) generateBtn.addEventListener("click", runMachine);
-
-  // Download CSV
-  if (downloadBtn) {
-    downloadBtn.addEventListener("click", () => {
-      const minDb = Number(document.getElementById("minDb").value);
-      const maxDb = Number(document.getElementById("maxDb").value);
-      const mode = document.getElementById("mapMode")?.value || "neutral";
-
-      if (!currentRows.length) {
-        if (status) status.textContent = "Nothing to download yet — click Generate first.";
-        return;
-      }
-      downloadTextFile("generated_word_db_data.csv", rowsToCsv(currentRows, minDb, maxDb, mode), "text/csv");
-    });
-  }
-
-  // Scrub
-  if (scrub) {
-    scrub.addEventListener("input", (e) => {
-      const t = Number(e.target.value);
-      document.getElementById("scrubTime").textContent = `${t.toFixed(2)}s`;
-      const db = getDbAtTime(t);
-      document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : `— dB`;
-    });
-  }
-
-  if (status) status.textContent = "Upload an audio file to begin.";
-});
