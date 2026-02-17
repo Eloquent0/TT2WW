@@ -3,42 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Word → dB Translation Machine</title>
+  <title>TT2WW — Word → dB Translation Machine</title>
   <link rel="stylesheet" href="./main.css" />
   <link rel="icon" type="image/png" href="Logo.png">
 </head>
 
 <body>
-  <audio id="audioPreview" style="display:none;" controls></audio>
   <div class="app">
+
     <details class="version">
-      <summary>ver.0.0.1</summary>
+      <summary>ver.0.0.2</summary>
       <div class="changelog">
         <ul>
           <li>Initial release</li>
           <li>Audio file upload and analysis</li>
           <li>Word-to-dB mapping visualization</li>
           <li>CSV export functionality</li>
+          <li>Login + save/publish/gallery via Supabase</li>
         </ul>
       </div>
     </details>
-    <nav class="tabs">
-      <ul>
-        <!-- Removed Explanation and About tabs -->
-      </ul>
-    </nav>
 
     <header class="topbar">
       <div>
         <h1 class="title">TT2WW</h1>
         <p class="sub">Word → dB Translation Machine</p>
-        <p class="sub">Upload a WAV file to analyze audio amplitude and drive typographic size per word.</p>
+        <p class="sub">Upload audio/video to analyze amplitude and drive typographic size per word.</p>
       </div>
+
       <div class="auth">
-        <input id="emailInput" class="input" placeholder="email@example.com">
+        <span id="authInfo" class="auth-info"></span>
+        <input id="emailInput" class="input auth-email" placeholder="email@example.com" type="email">
         <button id="loginBtn" class="btn">Login (Magic Link)</button>
-        <button id="logoutBtn" class="btn ghost">Logout</button>
+        <button id="galleryBtn" class="btn" style="display:none;">🎨 Gallery</button>
+        <button id="logoutBtn" class="btn ghost" style="display:none;">Logout</button>
       </div>
+
       <div class="badge">5:00</div>
     </header>
 
@@ -62,7 +62,7 @@
           </label>
         </div>
 
-        <label class="label">Text (used if transcription is disabled)</label>
+        <label class="label">Text (type or paste your transcript)</label>
         <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
 
         <div class="field">
@@ -76,7 +76,7 @@
 
         <div class="row row3">
           <div class="field">
-            <label class="label">Duration (s) - from WAV</label>
+            <label class="label">Duration (s) — from file</label>
             <input id="durationSec" class="input" type="number" value="0" readonly>
           </div>
           <div class="field">
@@ -94,6 +94,11 @@
           <button id="downloadCsvBtn" class="btn">Download CSV</button>
         </div>
 
+        <div class="row row2 actions">
+          <button id="saveDraftBtn" class="btn" disabled>💾 Save Draft</button>
+          <button id="publishBtn" class="btn" disabled>🌍 Publish Public</button>
+        </div>
+
         <p id="status" class="status flashing">Upload a WAV file to begin.</p>
       </div>
 
@@ -101,16 +106,16 @@
         <h2>Output</h2>
         <details>
           <summary>Output Details</summary>
-          <p>This section displays the generated typography output based on the audio analysis.</p>
+          <p>Generated typography output based on audio amplitude analysis.</p>
         </details>
 
         <div id="wordOutput" class="output" aria-label="Generated typography output">
           <div class="legend">
-            <span class="legend-label">Pitch (hue) + Volume (lightness):</span>
+            <span class="legend-label">Volume → Size + Color:</span>
             <div class="legend-gradient"></div>
             <div class="legend-labels">
-              <span>Low pitch / quiet</span>
-              <span>High pitch / loud</span>
+              <span>Quiet / Small</span>
+              <span>Loud / Large</span>
             </div>
           </div>
         </div>
@@ -129,7 +134,7 @@
       <h2>Generated Data</h2>
       <details>
         <summary>Data Details</summary>
-        <p>This section contains the generated data from the audio analysis.</p>
+        <p>Raw word-level data from the audio analysis.</p>
       </details>
 
       <div class="tableWrap">
@@ -149,10 +154,10 @@
         </table>
       </div>
     </section>
+
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./app.js"></script>
-  <audio id="audioPreview" style="display:none;"></audio>
 </body>
 </html>
