@@ -1,3 +1,5 @@
+alert("app.js loaded");
+
 // =============================
 // TT2WW — Word → dB Translation Machine (Audio File Input)
 // =============================
