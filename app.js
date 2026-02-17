@@ -295,22 +295,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  // ---------- DOM wiring ----------
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("✅ DOMContentLoaded");
-
-  const status = document.getElementById("status");
-  const fileInput = document.getElementById("wavFileInput");
-  const generateBtn = document.getElementById("generateBtn");
-  const downloadBtn = document.getElementById("downloadCsvBtn");
-  const scrub = document.getElementById("scrub");
-
-  if (!fileInput) {
-    console.error("❌ Missing #wavFileInput in HTML");
-    if (status) status.textContent = "❌ Missing file input (#wavFileInput).";
-    return;
-  }
-
   // File upload: decode audio and update duration field
   fileInput.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
