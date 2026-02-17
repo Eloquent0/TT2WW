@@ -1,4 +1,10 @@
-alert("app.js loaded");
+console.log("✅ app.js loaded");
+
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("✅ DOMContentLoaded fired");
+  console.log("wavFileInput =", document.getElementById("wavFileInput"));
+  console.log("durationSec  =", document.getElementById("durationSec"));
+});
 
 // =============================
 // TT2WW — Word → dB Translation Machine (Audio File Input)
