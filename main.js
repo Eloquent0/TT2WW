@@ -13,6 +13,56 @@ function tokenize(text) {
   return (text || "").trim().split(/\s+/).filter(Boolean);
 }
 
+// ---------- Parse timestamp format (time on one line, words on next) ----------
+function parseTimestampedText(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  const segments = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Check if this line is a timestamp (format: M:SS or MM:SS)
+    const timeMatch = line.match(/^(\d{1,2}):(\d{2})$/);
+    if (timeMatch && i + 1 < lines.length) {
+      const minutes = parseInt(timeMatch[1]);
+      const seconds = parseInt(timeMatch[2]);
+      const timeInSeconds = minutes * 60 + seconds;
+      const words = lines[i + 1].trim();
+      
+      if (words) {
+        segments.push({ time: timeInSeconds, words });
+      }
+      i++; // Skip the next line since we already processed it
+    }
+  }
+  
+  return segments;
+}
+
+// ---------- Create word rows from timestamped segments ----------
+function makeTimestampsFromSegments(segments, durationSec) {
+  if (!segments.length) return [];
+  
+  const rows = [];
+  
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const words = tokenize(seg.words);
+    const startTime = seg.time;
+    const endTime = i + 1 < segments.length ? segments[i + 1].time : durationSec;
+    const segDuration = endTime - startTime;
+    const wordDuration = words.length > 0 ? segDuration / words.length : 0;
+    
+    words.forEach((word, idx) => {
+      const start = startTime + (idx * wordDuration);
+      const end = Math.min(startTime + ((idx + 1) * wordDuration), endTime);
+      rows.push({ word, start, end });
+    });
+  }
+  
+  return rows;
+}
+
 function amplitudeToDb(amplitude) {
   return amplitude <= 0 ? -80 : 20 * Math.log10(amplitude);
 }
@@ -210,9 +260,22 @@ async function runMachine() {
     dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
 
     status.textContent = "📝 Tokenizing + timestamping...";
-    const words = tokenize(text);
-    // Duration passed directly — no global needed
-    const wordRows = makeTimestamps(words, durationSec);
+    
+    // Check if input has timestamp format (lines with M:SS or MM:SS)
+    const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
+    let wordRows;
+    
+    if (hasTimestamps) {
+      const segments = parseTimestampedText(text);
+      if (segments.length === 0) {
+        status.textContent = "❌ No valid timestamps found."; return;
+      }
+      wordRows = makeTimestampsFromSegments(segments, durationSec);
+      status.textContent = `📝 Parsed ${segments.length} timestamped segments...`;
+    } else {
+      const words = tokenize(text);
+      wordRows = makeTimestamps(words, durationSec);
+    }
 
     status.textContent = "📊 Mapping dB to words...";
     const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb);
