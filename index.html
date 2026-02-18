@@ -21,7 +21,7 @@
             <li>5 volume calculation methods (RMS, Weighted, Peak Smoothed, Median, Mean)</li>
             <li>Improved audio decoding with better error handling</li>
             <li>Fixed duration field auto-update on file upload</li>
-            <li>Version changelog auto-close after 5 seconds</li>
+            <li>Progressive word reveal animation with play/pause/reset</li>
           </ul>
         </div>
         <div class="changelog-history">
@@ -137,10 +137,16 @@
           <summary>Output Details</summary>
           <p>Generated typography output based on audio amplitude analysis.</p>
         </details>
-        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-          <button id="copyOutputBtn" class="btn" style="flex: 1;">📋 Copy Output</button>
-          <button id="playAnimationBtn" class="btn" style="flex: 1;">▶️ Play Animation</button>
+
+        <!-- Output action bar: copy on left, playback controls on right -->
+        <div class="output-controls">
+          <button id="copyOutputBtn" class="btn">📋 Copy</button>
+          <div class="playback-controls">
+            <button id="playAnimationBtn" class="btn play-btn" disabled>▶ Play</button>
+            <button id="resetAnimationBtn" class="btn reset-btn" disabled>↺ Reset</button>
+          </div>
         </div>
+
         <div id="wordOutput" class="output" aria-label="Generated typography output">
           <div class="legend">
             <span class="legend-label">Volume → Size + Color:</span>

@@ -146,19 +146,14 @@ function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
     
     switch(method) {
       case 'rms': {
-        // Root Mean Square - better represents perceived loudness
-        // Convert dB back to linear, calculate RMS, convert back to dB
         const linearValues = samples.map(s => Math.pow(10, s.db / 20));
         const rms = Math.sqrt(linearValues.reduce((sum, v) => sum + v * v, 0) / linearValues.length);
         db = clamp(20 * Math.log10(rms), minDb, maxDb);
         break;
       }
-      
       case 'weighted': {
-        // Weighted average - emphasize middle of word (where vowels typically are)
         const weighted = samples.reduce((sum, s, i) => {
-          const position = i / (samples.length - 1 || 1); // 0 to 1
-          // Gaussian-like weight: peaks at 0.5 (middle)
+          const position = i / (samples.length - 1 || 1);
           const weight = Math.exp(-Math.pow((position - 0.5) * 3, 2));
           return sum + s.db * weight;
         }, 0);
@@ -169,18 +164,14 @@ function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
         db = clamp(weighted / totalWeight, minDb, maxDb);
         break;
       }
-      
       case 'peak_smooth': {
-        // Peak with smoothing - use top 30% of samples to reduce spike impact
         const sorted = [...samples].sort((a, b) => b.db - a.db);
         const topCount = Math.max(1, Math.ceil(sorted.length * 0.3));
         const topSamples = sorted.slice(0, topCount);
         db = clamp(topSamples.reduce((sum, s) => sum + s.db, 0) / topSamples.length, minDb, maxDb);
         break;
       }
-      
       case 'median': {
-        // Median - more resistant to outliers
         const sorted = [...samples].sort((a, b) => a.db - b.db);
         const mid = Math.floor(sorted.length / 2);
         db = sorted.length % 2 === 0
@@ -188,8 +179,7 @@ function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
           : clamp(sorted[mid].db, minDb, maxDb);
         break;
       }
-      
-      default: // 'mean'
+      default:
         db = clamp(dbMean, minDb, maxDb);
     }
 
@@ -229,7 +219,6 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
     span.style.color = color;
     span.style.marginRight = `${clamp(Math.round(size * 0.18), 6, 48)}px`;
     
-    // Add data attributes for tooltip
     span.setAttribute('data-word', r.word);
     span.setAttribute('data-index', index + 1);
     span.setAttribute('data-start', r.start.toFixed(2));
@@ -238,7 +227,6 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
     span.setAttribute('data-db-max', (r.dbMax ?? r.db).toFixed(1));
     span.setAttribute('data-size', size);
     
-    // Create tooltip element
     const tooltip = document.createElement('div');
     tooltip.className = 'word-tooltip';
     tooltip.innerHTML = `
@@ -249,7 +237,6 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
       <div class="tooltip-row"><strong>Font Size:</strong> ${size}px</div>
     `;
     span.appendChild(tooltip);
-    
     container.appendChild(span);
   });
 }
@@ -337,7 +324,6 @@ async function runMachine() {
 
     status.textContent = "📝 Tokenizing + timestamping...";
     
-    // Check if input has timestamp format (lines with M:SS or MM:SS)
     const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
     let wordRows;
     
@@ -367,7 +353,6 @@ async function runMachine() {
 
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
     
-    // Update play button state
     if (updatePlayButtonState) updatePlayButtonState();
   } catch (err) {
     console.error("runMachine error:", err);
@@ -544,55 +529,46 @@ async function maybeLoadShared() {
   }
 }
 
-// ---------- DOM wiring — everything inside DOMContentLoaded ----------
+// ---------- DOM wiring ----------
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
-  // --- Version Details: Single directional state change animations ---
+  // --- Version Details ---
   const versionDetails = document.getElementById("versionDetails");
-let animationTimer = null;
+  let animationTimer = null;
 
-if (versionDetails) {
-  const summary = versionDetails.querySelector("summary");
-
-  if (summary) {
-    summary.addEventListener("click", (e) => {
-      e.preventDefault();
-
-      // Cancel any in-flight animation before committing to a new state
-      if (animationTimer !== null) {
-        clearTimeout(animationTimer);
-        animationTimer = null;
-        // Snap to the terminal state of whatever was in progress
-        const interrupted = versionDetails.dataset.state;
-        if (interrupted === "closing") versionDetails.open = false;
-        versionDetails.removeAttribute("data-state");
-      }
-
-      const isOpen = versionDetails.open;
-
-      if (isOpen) {
-        // open → closing
-        versionDetails.dataset.state = "closing";
-        animationTimer = setTimeout(() => {
-          versionDetails.open = false;
-          versionDetails.removeAttribute("data-state");
+  if (versionDetails) {
+    const summary = versionDetails.querySelector("summary");
+    if (summary) {
+      summary.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (animationTimer !== null) {
+          clearTimeout(animationTimer);
           animationTimer = null;
-        }, 300);
-      } else {
-        // closed → opening
-        versionDetails.open = true;
-        // Force reflow so the browser registers the open state before animating
-        void versionDetails.offsetHeight;
-        versionDetails.dataset.state = "opening";
-        animationTimer = setTimeout(() => {
+          const interrupted = versionDetails.dataset.state;
+          if (interrupted === "closing") versionDetails.open = false;
           versionDetails.removeAttribute("data-state");
-          animationTimer = null;
-        }, 300);
-      }
-    });
+        }
+        const isOpen = versionDetails.open;
+        if (isOpen) {
+          versionDetails.dataset.state = "closing";
+          animationTimer = setTimeout(() => {
+            versionDetails.open = false;
+            versionDetails.removeAttribute("data-state");
+            animationTimer = null;
+          }, 300);
+        } else {
+          versionDetails.open = true;
+          void versionDetails.offsetHeight;
+          versionDetails.dataset.state = "opening";
+          animationTimer = setTimeout(() => {
+            versionDetails.removeAttribute("data-state");
+            animationTimer = null;
+          }, 300);
+        }
+      });
+    }
   }
-}
 
   // --- Copy output text ---
   const copyOutputBtn = document.getElementById("copyOutputBtn");
@@ -601,41 +577,28 @@ if (versionDetails) {
       const wordOutput = document.getElementById("wordOutput");
       if (!wordOutput) return;
       
-      // Clone the output and remove tooltips
       const clone = wordOutput.cloneNode(true);
       clone.querySelectorAll('.word-tooltip').forEach(tooltip => tooltip.remove());
-      
-      // Add space between words by inserting text nodes
       const words = clone.querySelectorAll('.word');
       words.forEach((word, index) => {
-        if (index < words.length - 1) {
-          word.after(document.createTextNode(' '));
-        }
+        if (index < words.length - 1) word.after(document.createTextNode(' '));
       });
-      
-      // Get HTML with styling
       const htmlContent = clone.innerHTML;
-      
-      // Get plain text fallback
       const plainText = Array.from(wordOutput.querySelectorAll('.word'))
         .map(span => span.getAttribute('data-word') || '')
         .filter(text => text)
         .join(' ');
       
       try {
-        // Copy as rich text (HTML) and plain text
         await navigator.clipboard.write([
           new ClipboardItem({
             'text/html': new Blob([htmlContent], { type: 'text/html' }),
             'text/plain': new Blob([plainText], { type: 'text/plain' })
           })
         ]);
-        
         const originalText = copyOutputBtn.textContent;
         copyOutputBtn.textContent = '✅ Copied!';
-        setTimeout(() => {
-          copyOutputBtn.textContent = originalText;
-        }, 2000);
+        setTimeout(() => { copyOutputBtn.textContent = originalText; }, 2000);
       } catch (err) {
         console.error('Copy failed:', err);
         alert('Failed to copy');
@@ -653,7 +616,6 @@ if (versionDetails) {
     status.classList.remove("flashing");
     return;
   }
-  console.log("✅ Protocol OK:", window.location.protocol);
 
   // --- File upload ---
   const fileInput = document.getElementById("wavFileInput");
@@ -661,45 +623,25 @@ if (versionDetails) {
     fileInput.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-
       status.textContent = "⏳ Loading audio...";
-      console.log("📂 File selected:", file.name, file.type, file.size, "bytes");
       try {
         if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        console.log("🎵 AudioContext state:", audioContext.state);
         if (audioContext.state === "suspended") await audioContext.resume();
-
-        console.log("📦 Reading arrayBuffer...");
         const arrayBuffer = await file.arrayBuffer();
-        console.log("📦 arrayBuffer size:", arrayBuffer.byteLength);
-
-        console.log("🔊 Decoding audio...");
         audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        console.log("✅ Decoded! Duration:", audioBuffer.duration, "sampleRate:", audioBuffer.sampleRate, "channels:", audioBuffer.numberOfChannels);
         currentAudioFile = file;
-
         const duration = audioBuffer.duration;
-        console.log("⏱️ Duration check:", duration, "(valid:", duration > 0 && duration <= 300, ")");
         if (duration > 300 || duration <= 0) {
           status.textContent = duration > 300
             ? `❌ File too long: ${duration.toFixed(2)}s (max 5 min)`
             : "❌ Invalid audio duration.";
           audioBuffer = null; currentAudioFile = null; e.target.value = ""; return;
         }
-
         const durEl = document.getElementById("durationSec");
-        console.log("🔍 durationSec element:", durEl);
-        if (durEl) {
-          durEl.value = duration.toFixed(2);
-          console.log("✅ Set durationSec.value to:", durEl.value);
-        } else {
-          console.error("❌ #durationSec element NOT FOUND in DOM!");
-        }
-
+        if (durEl) durEl.value = duration.toFixed(2);
         status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate.`;
         status.classList.remove("flashing");
       } catch (err) {
-        console.error("❌ Audio decode failed:", err.name, err.message, err);
         status.textContent = `❌ ${err.message || "Could not decode audio. Try a WAV or MP3."}`;
         audioBuffer = null; currentAudioFile = null; e.target.value = "";
       }
@@ -709,14 +651,6 @@ if (versionDetails) {
   // --- Generate ---
   const generateBtn = document.getElementById("generateBtn");
   if (generateBtn) generateBtn.addEventListener("click", runMachine);
-  
-  // Listen for text changes to update play button state
-  const textInput = document.getElementById("textInput");
-  if (textInput) {
-    textInput.addEventListener("input", () => {
-      if (updatePlayButtonState) updatePlayButtonState();
-    });
-  }
 
   // --- Download CSV ---
   const downloadBtn = document.getElementById("downloadCsvBtn");
@@ -747,14 +681,12 @@ if (versionDetails) {
       currentUser = session?.user || null;
       updateAuthUI();
     });
-
     supabase.auth.onAuthStateChange((event, session) => {
       currentUser = session?.user || null;
       updateAuthUI();
       if (event === "SIGNED_IN") status.textContent = `✅ Logged in as ${currentUser.email}`;
       if (event === "SIGNED_OUT") status.textContent = "Logged out.";
     });
-
     maybeLoadShared();
   }
 
@@ -774,11 +706,9 @@ if (versionDetails) {
   }
 
   const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      if (supabase) await supabase.auth.signOut();
-    });
-  }
+  if (logoutBtn) logoutBtn.addEventListener("click", async () => {
+    if (supabase) await supabase.auth.signOut();
+  });
 
   const saveDraftBtn = document.getElementById("saveDraftBtn");
   if (saveDraftBtn) saveDraftBtn.addEventListener("click", () => saveCreation({ isPublic: false }));
@@ -789,100 +719,181 @@ if (versionDetails) {
   const galleryBtn = document.getElementById("galleryBtn");
   if (galleryBtn) galleryBtn.addEventListener("click", showGallery);
 
-  // --- Play Animation ---
-  let animationInterval = null;
-  let isAnimationPlaying = false;
-  
-  updatePlayButtonState = function() {
-    const playAnimationBtn = document.getElementById("playAnimationBtn");
-    if (!playAnimationBtn) return;
-    
-    const text = document.getElementById("textInput").value;
-    const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
-    
-    if (!hasTimestamps || !currentRows.length) {
-      playAnimationBtn.disabled = true;
-    } else {
-      playAnimationBtn.disabled = false;
-    }
+  // =====================================================
+  // --- Play Animation (Progressive Word Reveal) ---
+  // =====================================================
+
+  let rafId = null;           // requestAnimationFrame handle
+  let animStartTime = null;   // performance.now() when play was pressed
+  let animOffset = 0;         // how many seconds into the animation we are (for resume)
+  let isPlaying = false;
+  let nextWordIndex = 0;      // next word we haven't shown yet
+
+  updatePlayButtonState = function () {
+    const playBtn = document.getElementById("playAnimationBtn");
+    const resetBtn = document.getElementById("resetAnimationBtn");
+    if (!playBtn) return;
+    const hasRows = currentRows.length > 0;
+    playBtn.disabled = !hasRows;
+    if (resetBtn) resetBtn.disabled = !hasRows;
   };
-  
-  const playAnimationBtn = document.getElementById("playAnimationBtn");
-  if (playAnimationBtn) {
-    playAnimationBtn.addEventListener("click", () => {
-      const wordOutput = document.getElementById("wordOutput");
-      const words = wordOutput.querySelectorAll(".word");
-      
-      if (!words.length) {
-        status.textContent = "Generate output first to play animation.";
-        return;
-      }
-      
-      // Check if timestamps are present
-      const text = document.getElementById("textInput").value;
-      const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
-      
-      if (!hasTimestamps) {
-        return;
-      }
-      
-      // Toggle play/pause
-      if (isAnimationPlaying) {
-        // Stop animation
-        clearInterval(animationInterval);
-        isAnimationPlaying = false;
-        playAnimationBtn.textContent = "▶️ Play Animation";
-        
-        // Show all words
-        words.forEach(word => {
-          word.style.opacity = "1";
-        });
-        return;
-      }
-      
-      // Start animation
-      isAnimationPlaying = true;
-      playAnimationBtn.textContent = "⏸️ Pause Animation";
-      
-      console.log('Starting animation with', currentRows.length, 'words');
-      console.log('First 5 rows:', currentRows.slice(0, 5).map(r => ({ word: r.word, start: r.start })));
-      console.log('Word elements count:', words.length);
-      
-      // Hide all words initially
-      words.forEach((word, idx) => {
-        word.style.opacity = "0";
-        word.style.transition = "opacity 0.3s ease-in";
-      });
-      
-      console.log('All words hidden, starting animation...');
-      
-      // Animate words based on their timing
-      let currentIndex = 0;
-      const startTime = Date.now();
-      
-      animationInterval = setInterval(() => {
-        if (currentIndex >= currentRows.length) {
-          clearInterval(animationInterval);
-          isAnimationPlaying = false;
-          playAnimationBtn.textContent = "▶️ Play Animation";
-          console.log('Animation complete');
-          return;
-        }
-        
-        const elapsed = (Date.now() - startTime) / 1000; // in seconds
-        
-        // Show words whose start time has passed
-        while (currentIndex < currentRows.length && currentRows[currentIndex].start <= elapsed) {
-          if (words[currentIndex]) {
-            words[currentIndex].style.opacity = "1";
-            console.log(`Showing word ${currentIndex}: "${currentRows[currentIndex].word}" at ${elapsed.toFixed(2)}s (start: ${currentRows[currentIndex].start})`);
-          }
-          currentIndex++;
-        }
-      }, 50); // Check every 50ms for smooth animation
+
+  function getWordElements() {
+    return Array.from(document.querySelectorAll("#wordOutput .word"));
+  }
+
+  function hideAllWords() {
+    getWordElements().forEach(el => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(4px)";
+      el.style.transition = "none";
     });
   }
 
-  // Initial status
+  function showAllWords() {
+    getWordElements().forEach(el => {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0)";
+      el.style.transition = "none";
+    });
+  }
+
+  function revealWord(el) {
+    // Force a reflow so the transition fires from the hidden state
+    void el.offsetWidth;
+    el.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0)";
+  }
+
+  function stopAnimation() {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    isPlaying = false;
+    const playBtn = document.getElementById("playAnimationBtn");
+    if (playBtn) {
+      playBtn.textContent = "▶ Play";
+      playBtn.classList.remove("playing");
+    }
+  }
+
+  function resetAnimation() {
+    stopAnimation();
+    animOffset = 0;
+    nextWordIndex = 0;
+    showAllWords();
+  }
+
+  function startAnimation() {
+    if (!currentRows.length) return;
+
+    const els = getWordElements();
+    if (!els.length) return;
+
+    isPlaying = true;
+    const playBtn = document.getElementById("playAnimationBtn");
+    if (playBtn) {
+      playBtn.textContent = "⏸ Pause";
+      playBtn.classList.add("playing");
+    }
+
+    // Hide words that haven't been revealed yet
+    for (let i = nextWordIndex; i < els.length; i++) {
+      els[i].style.opacity = "0";
+      els[i].style.transform = "translateY(4px)";
+      els[i].style.transition = "none";
+    }
+
+    // Record start wall-clock time, accounting for any resume offset
+    animStartTime = performance.now() - animOffset * 1000;
+
+    function tick() {
+      if (!isPlaying) return;
+
+      const elapsed = (performance.now() - animStartTime) / 1000; // seconds
+
+      // Reveal all words whose start time has passed
+      while (nextWordIndex < currentRows.length && currentRows[nextWordIndex].start <= elapsed) {
+        if (els[nextWordIndex]) revealWord(els[nextWordIndex]);
+        nextWordIndex++;
+      }
+
+      // Update scrub bar if it exists
+      const scrubEl = document.getElementById("scrub");
+      if (scrubEl) {
+        scrubEl.value = Math.min(elapsed, parseFloat(scrubEl.max));
+        const timeEl = document.getElementById("scrubTime");
+        if (timeEl) timeEl.textContent = `${Math.min(elapsed, parseFloat(scrubEl.max)).toFixed(2)}s`;
+        const dbVal = getDbAtTime(elapsed);
+        const dbEl = document.getElementById("scrubDb");
+        if (dbEl) dbEl.textContent = Number.isFinite(dbVal) ? `${dbVal.toFixed(1)} dB` : "— dB";
+      }
+
+      if (nextWordIndex >= currentRows.length) {
+        // All words revealed — animation complete
+        stopAnimation();
+        animOffset = 0;
+        nextWordIndex = 0;
+        return;
+      }
+
+      rafId = requestAnimationFrame(tick);
+    }
+
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pauseAnimation() {
+    // Save position so we can resume from here
+    if (animStartTime !== null) {
+      animOffset = (performance.now() - animStartTime) / 1000;
+    }
+    stopAnimation();
+  }
+
+  // Wire up buttons
+  const playAnimationBtn = document.getElementById("playAnimationBtn");
+  if (playAnimationBtn) {
+    playAnimationBtn.addEventListener("click", () => {
+      if (!currentRows.length) {
+        status.textContent = "Generate output first to play animation.";
+        return;
+      }
+      if (isPlaying) {
+        pauseAnimation();
+      } else {
+        startAnimation();
+      }
+    });
+  }
+
+  const resetAnimationBtn = document.getElementById("resetAnimationBtn");
+  if (resetAnimationBtn) {
+    resetAnimationBtn.addEventListener("click", () => {
+      resetAnimation();
+    });
+  }
+
+  // Reset animation state whenever new output is generated
+  const origRunMachine = runMachine;
+  // Hook into post-render: reset play state after generate
+  const generateBtnEl = document.getElementById("generateBtn");
+  if (generateBtnEl) {
+    generateBtnEl.addEventListener("click", () => {
+      // Small delay to let runMachine finish rendering
+      setTimeout(() => {
+        stopAnimation();
+        animOffset = 0;
+        nextWordIndex = 0;
+        showAllWords(); // Show all words in static state after generate
+        updatePlayButtonState();
+      }, 100);
+    });
+  }
+
+  // Initial state
   status.textContent = "Upload an audio file to begin.";
+  updatePlayButtonState();
 });
