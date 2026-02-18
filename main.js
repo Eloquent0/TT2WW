@@ -593,32 +593,41 @@ if (versionDetails) {
   // --- Copy output text ---
   const copyOutputBtn = document.getElementById("copyOutputBtn");
   if (copyOutputBtn) {
-    copyOutputBtn.addEventListener("click", () => {
+    copyOutputBtn.addEventListener("click", async () => {
       const wordOutput = document.getElementById("wordOutput");
       if (!wordOutput) return;
       
-      // Get all word elements with their styling
-      const words = Array.from(wordOutput.querySelectorAll('.word'))
-        .map(span => {
-          const word = span.getAttribute('data-word') || span.firstChild?.nodeValue?.trim() || '';
-          const fontSize = span.style.fontSize;
-          const color = span.style.color;
-          return word ? `${word} [${fontSize}, ${color}]` : '';
-        })
-        .filter(text => text);
+      // Clone the output and remove tooltips
+      const clone = wordOutput.cloneNode(true);
+      clone.querySelectorAll('.word-tooltip').forEach(tooltip => tooltip.remove());
       
-      const text = words.join(' ');
+      // Get HTML with styling
+      const htmlContent = clone.innerHTML;
       
-      navigator.clipboard.writeText(text).then(() => {
+      // Get plain text fallback
+      const plainText = Array.from(wordOutput.querySelectorAll('.word'))
+        .map(span => span.getAttribute('data-word') || '')
+        .filter(text => text)
+        .join(' ');
+      
+      try {
+        // Copy as rich text (HTML) and plain text
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([htmlContent], { type: 'text/html' }),
+            'text/plain': new Blob([plainText], { type: 'text/plain' })
+          })
+        ]);
+        
         const originalText = copyOutputBtn.textContent;
         copyOutputBtn.textContent = '✅ Copied!';
         setTimeout(() => {
           copyOutputBtn.textContent = originalText;
         }, 2000);
-      }).catch(err => {
+      } catch (err) {
         console.error('Copy failed:', err);
         alert('Failed to copy');
-      });
+      }
     });
   }
 
