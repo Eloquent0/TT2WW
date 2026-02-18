@@ -601,6 +601,14 @@ if (versionDetails) {
       const clone = wordOutput.cloneNode(true);
       clone.querySelectorAll('.word-tooltip').forEach(tooltip => tooltip.remove());
       
+      // Add space between words by inserting text nodes
+      const words = clone.querySelectorAll('.word');
+      words.forEach((word, index) => {
+        if (index < words.length - 1) {
+          word.after(document.createTextNode(' '));
+        }
+      });
+      
       // Get HTML with styling
       const htmlContent = clone.innerHTML;
       
