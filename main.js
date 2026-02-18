@@ -1,7 +1,3 @@
-// =============================
-// TT2WW — Word → dB Translation Machine
-// =============================
-
 // ---------- Supabase (guarded so it CANNOT break the app) ----------
 const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk";
