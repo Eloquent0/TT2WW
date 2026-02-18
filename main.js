@@ -597,9 +597,14 @@ if (versionDetails) {
       const wordOutput = document.getElementById("wordOutput");
       if (!wordOutput) return;
       
-      // Get all word elements and extract just the text (without tooltips)
+      // Get all word elements with their styling
       const words = Array.from(wordOutput.querySelectorAll('.word'))
-        .map(span => span.childNodes[0].textContent.trim())
+        .map(span => {
+          const word = span.getAttribute('data-word') || span.firstChild?.nodeValue?.trim() || '';
+          const fontSize = span.style.fontSize;
+          const color = span.style.color;
+          return word ? `${word} [${fontSize}, ${color}]` : '';
+        })
         .filter(text => text);
       
       const text = words.join(' ');
