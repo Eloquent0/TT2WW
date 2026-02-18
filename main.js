@@ -1,20 +1,3 @@
-const SUPABASE_URL = "https://wtgglxxwtulnosftvflj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0Z2dseHh3dHVsbm9zZnR2ZmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTA3NzksImV4cCI6MjA4NjY4Njc3OX0.UPWE0sET_GYhnu4BT3zg8j8MCFuehzM1mXPOKfrTtAk";
-
-let supabase = null;
-let currentUser = null;
-
-try {
-  if (window.supabase && SUPABASE_ANON_KEY.startsWith("eyJ")) {
-    const { createClient } = window.supabase;   // add this line
-    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log("✅ Supabase initialized");
-  }
-} catch (e) {
-  console.warn("⚠️ Supabase init failed:", e.message);
-}
-
-
 // ---------- State ----------
 let currentRows = [];
 let dbTimeline = [];
