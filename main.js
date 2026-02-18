@@ -544,9 +544,8 @@ async function maybeLoadShared() {
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
-  // --- Version changelog auto-close ---
+  // --- Version Details with alternating animations ---
   const versionDetails = document.getElementById("versionDetails");
-  let closeTimer = null;
   let isAnimating = false;
   
   if (versionDetails) {
@@ -557,7 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
         
         if (versionDetails.open) {
-          // Closing - trigger animation first
+          // Already open - play hide animation (slideUp) then close
           isAnimating = true;
           versionDetails.classList.add('closing');
           setTimeout(() => {
@@ -565,30 +564,20 @@ document.addEventListener("DOMContentLoaded", () => {
             versionDetails.classList.remove('closing');
             isAnimating = false;
           }, 300);
-          if (closeTimer) clearTimeout(closeTimer);
         } else {
-          // Opening - no animation, just open
+          // Closed - play reveal animation (slideDown) then open
+          isAnimating = true;
+          versionDetails.classList.add('opening');
           versionDetails.open = true;
-          isAnimating = false;
-          
-          // Clear any existing timer
-          if (closeTimer) clearTimeout(closeTimer);
-          // Set new timer to close after 5 seconds
-          closeTimer = setTimeout(() => {
-            if (!versionDetails.open) return;
-            // Close with animation
-            isAnimating = true;
-            versionDetails.classList.add('closing');
-            setTimeout(() => {
-              versionDetails.open = false;
-              versionDetails.classList.remove('closing');
-              isAnimating = false;
-            }, 300);
-          }, 5000);
+          setTimeout(() => {
+            versionDetails.classList.remove('opening');
+            isAnimating = false;
+          }, 300);
         }
       });
     }
   }
+
 
   // --- Copy output text ---
   const copyOutputBtn = document.getElementById("copyOutputBtn");
