@@ -529,11 +529,19 @@ document.addEventListener("DOMContentLoaded", () => {
   if (versionDetails) {
     versionDetails.addEventListener("toggle", () => {
       if (versionDetails.open) {
+        // Remove closing class when opening
+        versionDetails.classList.remove('closing');
         // Clear any existing timer
         if (closeTimer) clearTimeout(closeTimer);
         // Set new timer to close after 5 seconds
         closeTimer = setTimeout(() => {
-          versionDetails.open = false;
+          // Add closing class to trigger animation
+          versionDetails.classList.add('closing');
+          // Wait for animation to complete, then actually close
+          setTimeout(() => {
+            versionDetails.open = false;
+            versionDetails.classList.remove('closing');
+          }, 300); // Match animation duration
         }, 5000);
       } else {
         // Clear timer if manually closed

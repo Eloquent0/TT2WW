@@ -206,6 +206,34 @@ body {
   border-radius: 6px;
   padding: 10px;
   border: 1px solid rgba(255,255,255,0.1);
+  animation: slideDown 0.3s ease-out;
+  transform-origin: top;
+}
+
+.version.closing .changelog {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scaleY(0.8);
+  }
 }
 
 .changelog-current {
