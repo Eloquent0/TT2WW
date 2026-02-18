@@ -550,7 +550,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let isAnimating = false;
   
   if (versionDetails) {
-    // Override default toggle to add animation
     const summary = versionDetails.querySelector('summary');
     if (summary) {
       summary.addEventListener("click", (e) => {
@@ -568,27 +567,54 @@ document.addEventListener("DOMContentLoaded", () => {
           }, 300);
           if (closeTimer) clearTimeout(closeTimer);
         } else {
-          // Opening
+          // Opening - no animation, just open
           versionDetails.open = true;
-          versionDetails.classList.remove('closing');
+          isAnimating = false;
+          
           // Clear any existing timer
           if (closeTimer) clearTimeout(closeTimer);
           // Set new timer to close after 5 seconds
           closeTimer = setTimeout(() => {
             if (!versionDetails.open) return;
-            // Add closing class to trigger animation
+            // Close with animation
             isAnimating = true;
             versionDetails.classList.add('closing');
-            // Wait for animation to complete, then actually close
             setTimeout(() => {
               versionDetails.open = false;
               versionDetails.classList.remove('closing');
               isAnimating = false;
-            }, 300); // Match animation duration
+            }, 300);
           }, 5000);
         }
       });
     }
+  }
+
+  // --- Copy output text ---
+  const copyOutputBtn = document.getElementById("copyOutputBtn");
+  if (copyOutputBtn) {
+    copyOutputBtn.addEventListener("click", () => {
+      const wordOutput = document.getElementById("wordOutput");
+      if (!wordOutput) return;
+      
+      // Get all words without tooltips
+      const words = Array.from(wordOutput.querySelectorAll('.word'))
+        .map(span => span.textContent.trim())
+        .filter(text => text);
+      
+      const text = words.join(' ');
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = copyOutputBtn.textContent;
+        copyOutputBtn.textContent = '✅ Copied!';
+        setTimeout(() => {
+          copyOutputBtn.textContent = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error('Copy failed:', err);
+        alert('Failed to copy');
+      });
+    });
   }
 
   // --- Startup diagnostics ---
