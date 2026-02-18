@@ -4,7 +4,16 @@ let dbTimeline = [];
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
-let updatePlayButtonState = null; // Will be assigned in DOMContentLoaded
+let updatePlayButtonState = null; // assigned in DOMContentLoaded
+
+// ---------- Animation State (module-level so runMachine can reset it) ----------
+let animRafId = null;
+let animStartTime = null;
+let animOffset = 0;
+let animIsPlaying = false;
+let animNextWordIndex = 0;
+let animStopFn = null;    // assigned in DOMContentLoaded
+let animShowAllFn = null; // assigned in DOMContentLoaded
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -352,7 +361,12 @@ async function runMachine() {
     if (durEl) durEl.value = durationSec.toFixed(2);
 
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
-    
+
+    // Reset animation to clean state after every generate
+    if (animStopFn) animStopFn();
+    animOffset = 0;
+    animNextWordIndex = 0;
+    if (animShowAllFn) animShowAllFn();
     if (updatePlayButtonState) updatePlayButtonState();
   } catch (err) {
     console.error("runMachine error:", err);
@@ -723,11 +737,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Play Animation (Progressive Word Reveal) ---
   // =====================================================
 
-  let rafId = null;           // requestAnimationFrame handle
-  let animStartTime = null;   // performance.now() when play was pressed
-  let animOffset = 0;         // how many seconds into the animation we are (for resume)
-  let isPlaying = false;
-  let nextWordIndex = 0;      // next word we haven't shown yet
+  // Animation state is module-level (animRafId, animOffset, etc.)
+  // Assign helper refs so runMachine can call them
 
   updatePlayButtonState = function () {
     const playBtn = document.getElementById("playAnimationBtn");
@@ -757,6 +768,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.style.transition = "none";
     });
   }
+  animShowAllFn = showAllWords;
 
   function revealWord(el) {
     // Force a reflow so the transition fires from the hidden state
@@ -767,22 +779,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function stopAnimation() {
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
+    if (animRafId !== null) {
+      cancelAnimationFrame(animRafId);
+      animRafId = null;
     }
-    isPlaying = false;
+    animIsPlaying = false;
     const playBtn = document.getElementById("playAnimationBtn");
     if (playBtn) {
       playBtn.textContent = "▶ Play";
       playBtn.classList.remove("playing");
     }
   }
+  animStopFn = stopAnimation;
 
   function resetAnimation() {
     stopAnimation();
     animOffset = 0;
-    nextWordIndex = 0;
+    animNextWordIndex = 0;
     showAllWords();
   }
 
@@ -792,7 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const els = getWordElements();
     if (!els.length) return;
 
-    isPlaying = true;
+    animIsPlaying = true;
     const playBtn = document.getElementById("playAnimationBtn");
     if (playBtn) {
       playBtn.textContent = "⏸ Pause";
@@ -800,7 +813,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Hide words that haven't been revealed yet
-    for (let i = nextWordIndex; i < els.length; i++) {
+    for (let i = animNextWordIndex; i < els.length; i++) {
       els[i].style.opacity = "0";
       els[i].style.transform = "translateY(4px)";
       els[i].style.transition = "none";
@@ -810,14 +823,14 @@ document.addEventListener("DOMContentLoaded", () => {
     animStartTime = performance.now() - animOffset * 1000;
 
     function tick() {
-      if (!isPlaying) return;
+      if (!animIsPlaying) return;
 
       const elapsed = (performance.now() - animStartTime) / 1000; // seconds
 
       // Reveal all words whose start time has passed
-      while (nextWordIndex < currentRows.length && currentRows[nextWordIndex].start <= elapsed) {
-        if (els[nextWordIndex]) revealWord(els[nextWordIndex]);
-        nextWordIndex++;
+      while (animNextWordIndex < currentRows.length && currentRows[animNextWordIndex].start <= elapsed) {
+        if (els[animNextWordIndex]) revealWord(els[animNextWordIndex]);
+        animNextWordIndex++;
       }
 
       // Update scrub bar if it exists
@@ -831,18 +844,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (dbEl) dbEl.textContent = Number.isFinite(dbVal) ? `${dbVal.toFixed(1)} dB` : "— dB";
       }
 
-      if (nextWordIndex >= currentRows.length) {
+      if (animNextWordIndex >= currentRows.length) {
         // All words revealed — animation complete
         stopAnimation();
         animOffset = 0;
-        nextWordIndex = 0;
+        animNextWordIndex = 0;
         return;
       }
 
-      rafId = requestAnimationFrame(tick);
+      animRafId = requestAnimationFrame(tick);
     }
 
-    rafId = requestAnimationFrame(tick);
+    animRafId = requestAnimationFrame(tick);
   }
 
   function pauseAnimation() {
@@ -861,7 +874,7 @@ document.addEventListener("DOMContentLoaded", () => {
         status.textContent = "Generate output first to play animation.";
         return;
       }
-      if (isPlaying) {
+      if (animIsPlaying) {
         pauseAnimation();
       } else {
         startAnimation();
@@ -873,23 +886,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (resetAnimationBtn) {
     resetAnimationBtn.addEventListener("click", () => {
       resetAnimation();
-    });
-  }
-
-  // Reset animation state whenever new output is generated
-  const origRunMachine = runMachine;
-  // Hook into post-render: reset play state after generate
-  const generateBtnEl = document.getElementById("generateBtn");
-  if (generateBtnEl) {
-    generateBtnEl.addEventListener("click", () => {
-      // Small delay to let runMachine finish rendering
-      setTimeout(() => {
-        stopAnimation();
-        animOffset = 0;
-        nextWordIndex = 0;
-        showAllWords(); // Show all words in static state after generate
-        updatePlayButtonState();
-      }, 100);
     });
   }
 
