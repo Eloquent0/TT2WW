@@ -365,6 +365,9 @@ async function runMachine() {
     if (durEl) durEl.value = durationSec.toFixed(2);
 
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
+    
+    // Update play button state
+    if (typeof updatePlayButtonState === 'function') updatePlayButtonState();
   } catch (err) {
     console.error("runMachine error:", err);
     status.textContent = `❌ Error: ${err.message}`;
@@ -705,6 +708,14 @@ if (versionDetails) {
   // --- Generate ---
   const generateBtn = document.getElementById("generateBtn");
   if (generateBtn) generateBtn.addEventListener("click", runMachine);
+  
+  // Listen for text changes to update play button state
+  const textInput = document.getElementById("textInput");
+  if (textInput) {
+    textInput.addEventListener("input", () => {
+      if (typeof updatePlayButtonState === 'function') updatePlayButtonState();
+    });
+  }
 
   // --- Download CSV ---
   const downloadBtn = document.getElementById("downloadCsvBtn");
@@ -776,6 +787,95 @@ if (versionDetails) {
 
   const galleryBtn = document.getElementById("galleryBtn");
   if (galleryBtn) galleryBtn.addEventListener("click", showGallery);
+
+  // --- Play Animation ---
+  let animationInterval = null;
+  let isAnimationPlaying = false;
+  
+  function updatePlayButtonState() {
+    const playAnimationBtn = document.getElementById("playAnimationBtn");
+    if (!playAnimationBtn) return;
+    
+    const text = document.getElementById("textInput").value;
+    const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
+    
+    if (!hasTimestamps || !currentRows.length) {
+      playAnimationBtn.disabled = true;
+    } else {
+      playAnimationBtn.disabled = false;
+    }
+  }
+  
+  const playAnimationBtn = document.getElementById("playAnimationBtn");
+  if (playAnimationBtn) {
+    playAnimationBtn.addEventListener("click", () => {
+      const wordOutput = document.getElementById("wordOutput");
+      const words = wordOutput.querySelectorAll(".word");
+      
+      if (!words.length) {
+        status.textContent = "Generate output first to play animation.";
+        return;
+      }
+      
+      // Check if timestamps are present
+      const text = document.getElementById("textInput").value;
+      const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
+      
+      if (!hasTimestamps) {
+        return;
+      }
+      
+      // Toggle play/pause
+      if (isAnimationPlaying) {
+        // Stop animation
+        clearInterval(animationInterval);
+        isAnimationPlaying = false;
+        playAnimationBtn.textContent = "▶️ Play Animation";
+        
+        // Show all words
+        words.forEach(word => {
+          word.style.opacity = "1";
+        });
+        return;
+      }
+      
+      // Start animation
+      isAnimationPlaying = true;
+      playAnimationBtn.textContent = "⏸️ Pause Animation";
+      
+      // Hide all words initially
+      words.forEach(word => {
+        word.style.opacity = "0";
+        word.style.transition = "opacity 0.3s ease-in";
+      });
+      
+      // Animate words based on their timing
+      let currentIndex = 0;
+      const startTime = Date.now();
+      
+      console.log('Starting animation with', currentRows.length, 'words');
+      console.log('First few rows:', currentRows.slice(0, 5));
+      
+      animationInterval = setInterval(() => {
+        if (currentIndex >= currentRows.length) {
+          clearInterval(animationInterval);
+          isAnimationPlaying = false;
+          playAnimationBtn.textContent = "▶️ Play Animation";
+          return;
+        }
+        
+        const elapsed = (Date.now() - startTime) / 1000; // in seconds
+        
+        // Show words whose start time has passed
+        while (currentIndex < currentRows.length && currentRows[currentIndex].start <= elapsed) {
+          if (words[currentIndex]) {
+            words[currentIndex].style.opacity = "1";
+          }
+          currentIndex++;
+        }
+      }, 50); // Check every 50ms for smooth animation
+    });
+  }
 
   // Initial status
   status.textContent = "Upload an audio file to begin.";
