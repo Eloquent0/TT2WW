@@ -546,42 +546,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Version Details: Single directional state change animations ---
   const versionDetails = document.getElementById("versionDetails");
-  let isAnimating = false;
-  
-  if (versionDetails) {
-    const summary = versionDetails.querySelector('summary');
-    if (summary) {
-      summary.addEventListener("click", (e) => {
-        e.preventDefault();
-        if (isAnimating) return;
-        
-        const isCurrentlyOpen = versionDetails.open;
-        
-        if (isCurrentlyOpen) {
-          // State: Open → Closing
-          isAnimating = true;
-          versionDetails.classList.remove('opening');
-          versionDetails.classList.add('closing');
-          setTimeout(() => {
-            versionDetails.open = false;
-            versionDetails.classList.remove('closing');
-            isAnimating = false;
-          }, 300);
-        } else {
-          // State: Closed → Opening
-          isAnimating = true;
-          versionDetails.classList.remove('closing');
-          versionDetails.open = true;
-          versionDetails.classList.add('opening');
-          setTimeout(() => {
-            versionDetails.classList.remove('opening');
-            isAnimating = false;
-          }, 300);
-        }
-      });
-    }
-  }
+let animationTimer = null;
 
+if (versionDetails) {
+  const summary = versionDetails.querySelector("summary");
+
+  if (summary) {
+    summary.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      // Cancel any in-flight animation before committing to a new state
+      if (animationTimer !== null) {
+        clearTimeout(animationTimer);
+        animationTimer = null;
+        // Snap to the terminal state of whatever was in progress
+        const interrupted = versionDetails.dataset.state;
+        if (interrupted === "closing") versionDetails.open = false;
+        versionDetails.removeAttribute("data-state");
+      }
+
+      const isOpen = versionDetails.open;
+
+      if (isOpen) {
+        // open → closing
+        versionDetails.dataset.state = "closing";
+        animationTimer = setTimeout(() => {
+          versionDetails.open = false;
+          versionDetails.removeAttribute("data-state");
+          animationTimer = null;
+        }, 300);
+      } else {
+        // closed → opening
+        versionDetails.open = true;
+        // Force reflow so the browser registers the open state before animating
+        void versionDetails.offsetHeight;
+        versionDetails.dataset.state = "opening";
+        animationTimer = setTimeout(() => {
+          versionDetails.removeAttribute("data-state");
+          animationTimer = null;
+        }, 300);
+      }
+    });
+  }
+}
 
   // --- Copy output text ---
   const copyOutputBtn = document.getElementById("copyOutputBtn");
