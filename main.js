@@ -6,14 +6,6 @@ let audioContext = null;
 let currentAudioFile = null;
 let updatePlayButtonState = null; // assigned in DOMContentLoaded
 
-// ---------- Animation State (module-level so runMachine can reset it) ----------
-let animRafId = null;
-let animStartTime = null;
-let animOffset = 0;
-let animIsPlaying = false;
-let animNextWordIndex = 0;
-let animStopFn = null;    // assigned in DOMContentLoaded
-let animShowAllFn = null; // assigned in DOMContentLoaded
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -362,20 +354,11 @@ async function runMachine() {
 
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
 
-    // Reset animation state so Play is ready from the start
-    if (animRafId !== null) { cancelAnimationFrame(animRafId); animRafId = null; }
-    animIsPlaying = false;
-    animOffset = 0;
-    animNextWordIndex = 0;
-    // Show all words in static state (no fade — just reset)
-    document.querySelectorAll("#wordOutput .word").forEach(el => {
-      el.style.opacity = "1";
-      el.style.transform = "translateY(0)";
-      el.style.transition = "none";
-    });
+    // Enable play button now that rows are ready
     const playBtn = document.getElementById("playAnimationBtn");
-    if (playBtn) { playBtn.textContent = "▶ Play"; playBtn.classList.remove("playing"); }
-    if (updatePlayButtonState) updatePlayButtonState();
+    const resetBtn = document.getElementById("resetAnimationBtn");
+    if (playBtn) { playBtn.disabled = false; playBtn.textContent = "▶ Play"; }
+    if (resetBtn) resetBtn.disabled = false;
   } catch (err) {
     console.error("runMachine error:", err);
     status.textContent = `❌ Error: ${err.message}`;
@@ -742,159 +725,70 @@ document.addEventListener("DOMContentLoaded", () => {
   if (galleryBtn) galleryBtn.addEventListener("click", showGallery);
 
   // =====================================================
-  // --- Play Animation (Progressive Word Reveal) ---
+  // --- Play Animation: simple setTimeout per word ---
   // =====================================================
 
-  // Animation state is module-level (animRafId, animOffset, etc.)
-  // Assign helper refs so runMachine can call them
+  let activeTimeouts = [];   // so Reset can cancel them
+  let animRunning = false;
 
-  updatePlayButtonState = function () {
-    const playBtn = document.getElementById("playAnimationBtn");
-    const resetBtn = document.getElementById("resetAnimationBtn");
-    if (!playBtn) return;
-    const hasRows = currentRows.length > 0;
-    playBtn.disabled = !hasRows;
-    if (resetBtn) resetBtn.disabled = !hasRows;
-  };
-
-  function getWordElements() {
-    return Array.from(document.querySelectorAll("#wordOutput .word"));
-  }
-
-  function hideAllWords() {
-    getWordElements().forEach(el => {
-      el.style.opacity = "0";
-      el.style.transform = "translateY(4px)";
-      el.style.transition = "none";
-    });
-  }
-
-  function showAllWords() {
-    getWordElements().forEach(el => {
-      el.style.opacity = "1";
-      el.style.transform = "translateY(0)";
-      el.style.transition = "none";
-    });
-  }
-  animShowAllFn = showAllWords;
-
-  function revealWord(el) {
-    // Force a reflow so the transition fires from the hidden state
-    void el.offsetWidth;
-    el.style.transition = "opacity 0.25s ease, transform 0.25s ease";
-    el.style.opacity = "1";
-    el.style.transform = "translateY(0)";
-  }
-
-  function stopAnimation() {
-    if (animRafId !== null) {
-      cancelAnimationFrame(animRafId);
-      animRafId = null;
-    }
-    animIsPlaying = false;
-    const playBtn = document.getElementById("playAnimationBtn");
-    if (playBtn) {
-      playBtn.textContent = "▶ Play";
-      playBtn.classList.remove("playing");
-    }
-  }
-  animStopFn = stopAnimation;
-
-  function resetAnimation() {
-    stopAnimation();
-    animOffset = 0;
-    animNextWordIndex = 0;
-    showAllWords();
-  }
-
-  function startAnimation() {
+  function playAnimation() {
     if (!currentRows.length) return;
 
-    const els = getWordElements();
-    if (!els.length) return;
+    const words = Array.from(document.querySelectorAll("#wordOutput .word"));
+    if (!words.length) return;
 
-    animIsPlaying = true;
-    const playBtn = document.getElementById("playAnimationBtn");
-    if (playBtn) {
-      playBtn.textContent = "⏸ Pause";
-      playBtn.classList.add("playing");
-    }
+    const playBtn  = document.getElementById("playAnimationBtn");
+    const resetBtn = document.getElementById("resetAnimationBtn");
 
-    // Hide words that haven't been revealed yet
-    for (let i = animNextWordIndex; i < els.length; i++) {
-      els[i].style.opacity = "0";
-      els[i].style.transform = "translateY(4px)";
-      els[i].style.transition = "none";
-    }
+    // Hide every word immediately, no transition
+    words.forEach(w => { w.style.transition = "none"; w.style.opacity = "0"; });
 
-    // Record start wall-clock time, accounting for any resume offset
-    animStartTime = performance.now() - animOffset * 1000;
+    animRunning = true;
+    if (playBtn)  { playBtn.textContent = "▶ Playing…"; playBtn.disabled = true; }
+    if (resetBtn) resetBtn.disabled = true;
 
-    function tick() {
-      if (!animIsPlaying) return;
+    // Schedule each word to appear at its start time (ms)
+    activeTimeouts = currentRows.map((row, i) => {
+      return setTimeout(() => {
+        if (words[i]) words[i].style.opacity = "1";
+      }, row.start * 1000);
+    });
 
-      const elapsed = (performance.now() - animStartTime) / 1000; // seconds
-
-      // Reveal all words whose start time has passed
-      while (animNextWordIndex < currentRows.length && currentRows[animNextWordIndex].start <= elapsed) {
-        if (els[animNextWordIndex]) revealWord(els[animNextWordIndex]);
-        animNextWordIndex++;
-      }
-
-      // Update scrub bar if it exists
-      const scrubEl = document.getElementById("scrub");
-      if (scrubEl) {
-        scrubEl.value = Math.min(elapsed, parseFloat(scrubEl.max));
-        const timeEl = document.getElementById("scrubTime");
-        if (timeEl) timeEl.textContent = `${Math.min(elapsed, parseFloat(scrubEl.max)).toFixed(2)}s`;
-        const dbVal = getDbAtTime(elapsed);
-        const dbEl = document.getElementById("scrubDb");
-        if (dbEl) dbEl.textContent = Number.isFinite(dbVal) ? `${dbVal.toFixed(1)} dB` : "— dB";
-      }
-
-      if (animNextWordIndex >= currentRows.length) {
-        // All words revealed — animation complete
-        stopAnimation();
-        animOffset = 0;
-        animNextWordIndex = 0;
-        return;
-      }
-
-      animRafId = requestAnimationFrame(tick);
-    }
-
-    animRafId = requestAnimationFrame(tick);
+    // When the last word has appeared, re-enable buttons
+    const totalMs = currentRows[currentRows.length - 1].start * 1000 + 300;
+    activeTimeouts.push(setTimeout(() => {
+      animRunning = false;
+      if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
+      if (resetBtn) resetBtn.disabled = false;
+    }, totalMs));
   }
 
-  function pauseAnimation() {
-    // Save position so we can resume from here
-    if (animStartTime !== null) {
-      animOffset = (performance.now() - animStartTime) / 1000;
-    }
-    stopAnimation();
+  function resetAnimation() {
+    // Cancel every pending timeout
+    activeTimeouts.forEach(id => clearTimeout(id));
+    activeTimeouts = [];
+    animRunning = false;
+
+    const playBtn  = document.getElementById("playAnimationBtn");
+    const resetBtn = document.getElementById("resetAnimationBtn");
+    if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
+    if (resetBtn) resetBtn.disabled = false;
+
+    // Show all words
+    document.querySelectorAll("#wordOutput .word").forEach(w => {
+      w.style.transition = "none";
+      w.style.opacity = "1";
+    });
   }
 
-  // Wire up buttons
   const playAnimationBtn = document.getElementById("playAnimationBtn");
   if (playAnimationBtn) {
-    playAnimationBtn.addEventListener("click", () => {
-      if (!currentRows.length) {
-        status.textContent = "Generate output first to play animation.";
-        return;
-      }
-      if (animIsPlaying) {
-        pauseAnimation();
-      } else {
-        startAnimation();
-      }
-    });
+    playAnimationBtn.addEventListener("click", playAnimation);
   }
 
   const resetAnimationBtn = document.getElementById("resetAnimationBtn");
   if (resetAnimationBtn) {
-    resetAnimationBtn.addEventListener("click", () => {
-      resetAnimation();
-    });
+    resetAnimationBtn.addEventListener("click", resetAnimation);
   }
 
   // Initial state
