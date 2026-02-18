@@ -544,7 +544,7 @@ async function maybeLoadShared() {
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
-  // --- Version Details with alternating animations ---
+  // --- Version Details: Single directional state change animations ---
   const versionDetails = document.getElementById("versionDetails");
   let isAnimating = false;
   
@@ -552,12 +552,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const summary = versionDetails.querySelector('summary');
     if (summary) {
       summary.addEventListener("click", (e) => {
-        if (isAnimating) return;
         e.preventDefault();
+        if (isAnimating) return;
         
-        if (versionDetails.open) {
-          // Already open - play hide animation (slideUp) then close
+        const isCurrentlyOpen = versionDetails.open;
+        
+        if (isCurrentlyOpen) {
+          // State: Open → Closing
           isAnimating = true;
+          versionDetails.classList.remove('opening');
           versionDetails.classList.add('closing');
           setTimeout(() => {
             versionDetails.open = false;
@@ -565,10 +568,11 @@ document.addEventListener("DOMContentLoaded", () => {
             isAnimating = false;
           }, 300);
         } else {
-          // Closed - play reveal animation (slideDown) then open
+          // State: Closed → Opening
           isAnimating = true;
-          versionDetails.classList.add('opening');
+          versionDetails.classList.remove('closing');
           versionDetails.open = true;
+          versionDetails.classList.add('opening');
           setTimeout(() => {
             versionDetails.classList.remove('opening');
             isAnimating = false;
