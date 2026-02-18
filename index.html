@@ -74,6 +74,17 @@
           </select>
         </div>
 
+        <div class="field">
+          <label class="label">Volume Calculation Method</label>
+          <select id="volumeMethod" class="input">
+            <option value="rms">RMS (Root Mean Square) - Most Accurate</option>
+            <option value="weighted">Weighted Average (emphasize vowels)</option>
+            <option value="peak_smooth">Peak Smoothed (top 30%)</option>
+            <option value="median">Median (outlier resistant)</option>
+            <option value="mean">Simple Mean (original)</option>
+          </select>
+        </div>
+
         <div class="row row3">
           <div class="field">
             <label class="label">Duration (s) — from file</label>

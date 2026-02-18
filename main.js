@@ -125,9 +125,10 @@ function makeTimestamps(words, durationSec) {
   return rows;
 }
 
-// ---------- Assign dB to words ----------
-function assignDbToWords(wordRows, dbTimeline, minDb, maxDb) {
+// ---------- Assign dB to words (with multiple calculation modes) ----------
+function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
   const SILENCE_FLOOR = -60;
+  
   return wordRows.map(row => {
     const samples = dbTimeline
       .filter(s => s.t >= row.start && s.t <= row.end)
@@ -138,11 +139,62 @@ function assignDbToWords(wordRows, dbTimeline, minDb, maxDb) {
       return { ...row, db: v, dbMean: v, dbMax: v };
     }
 
+    let db;
     const dbMean = samples.reduce((sum, s) => sum + s.db, 0) / samples.length;
     const dbMax = Math.max(...samples.map(s => s.db));
+    
+    switch(method) {
+      case 'rms': {
+        // Root Mean Square - better represents perceived loudness
+        // Convert dB back to linear, calculate RMS, convert back to dB
+        const linearValues = samples.map(s => Math.pow(10, s.db / 20));
+        const rms = Math.sqrt(linearValues.reduce((sum, v) => sum + v * v, 0) / linearValues.length);
+        db = clamp(20 * Math.log10(rms), minDb, maxDb);
+        break;
+      }
+      
+      case 'weighted': {
+        // Weighted average - emphasize middle of word (where vowels typically are)
+        const weighted = samples.reduce((sum, s, i) => {
+          const position = i / (samples.length - 1 || 1); // 0 to 1
+          // Gaussian-like weight: peaks at 0.5 (middle)
+          const weight = Math.exp(-Math.pow((position - 0.5) * 3, 2));
+          return sum + s.db * weight;
+        }, 0);
+        const totalWeight = samples.reduce((sum, s, i) => {
+          const position = i / (samples.length - 1 || 1);
+          return sum + Math.exp(-Math.pow((position - 0.5) * 3, 2));
+        }, 0);
+        db = clamp(weighted / totalWeight, minDb, maxDb);
+        break;
+      }
+      
+      case 'peak_smooth': {
+        // Peak with smoothing - use top 30% of samples to reduce spike impact
+        const sorted = [...samples].sort((a, b) => b.db - a.db);
+        const topCount = Math.max(1, Math.ceil(sorted.length * 0.3));
+        const topSamples = sorted.slice(0, topCount);
+        db = clamp(topSamples.reduce((sum, s) => sum + s.db, 0) / topSamples.length, minDb, maxDb);
+        break;
+      }
+      
+      case 'median': {
+        // Median - more resistant to outliers
+        const sorted = [...samples].sort((a, b) => a.db - b.db);
+        const mid = Math.floor(sorted.length / 2);
+        db = sorted.length % 2 === 0
+          ? clamp((sorted[mid - 1].db + sorted[mid].db) / 2, minDb, maxDb)
+          : clamp(sorted[mid].db, minDb, maxDb);
+        break;
+      }
+      
+      default: // 'mean'
+        db = clamp(dbMean, minDb, maxDb);
+    }
+
     return {
       ...row,
-      db: clamp(dbMean, minDb, maxDb),
+      db: db,
       dbMean: clamp(dbMean, minDb, maxDb),
       dbMax: clamp(dbMax, minDb, maxDb)
     };
@@ -243,6 +295,7 @@ async function runMachine() {
   const minDb = Number(document.getElementById("minDb").value);
   const maxDb = Number(document.getElementById("maxDb").value);
   const mode = document.getElementById("mapMode")?.value || "neutral";
+  const volumeMethod = document.getElementById("volumeMethod")?.value || "rms";
 
   try {
     if (!audioBuffer) { status.textContent = "❌ Please upload an audio file first."; return; }
@@ -278,7 +331,7 @@ async function runMachine() {
     }
 
     status.textContent = "📊 Mapping dB to words...";
-    const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb);
+    const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb, volumeMethod);
     currentRows = rows;
 
     status.textContent = "🎨 Rendering...";
