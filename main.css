@@ -387,11 +387,47 @@ h1 {
   padding: 2px 2px;
   border-radius: 6px;
   font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+  cursor: pointer;
 }
 
 .word:hover {
   outline: 1px solid rgba(0,0,0,0.12);
   background: rgba(0,0,0,0.04);
+}
+
+.word-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 15, 23, 0.98);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.word:hover .word-tooltip {
+  opacity: 1;
+}
+
+.tooltip-row {
+  color: var(--text);
+  margin: 3px 0;
+  line-height: 1.4;
+}
+
+.tooltip-row strong {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .legend {

@@ -217,7 +217,7 @@ function escapeHtml(str) {
 function renderWords(rows, minDb, maxDb, mode = "neutral") {
   const container = document.getElementById("wordOutput");
   container.innerHTML = "";
-  rows.forEach(r => {
+  rows.forEach((r, index) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
     const color = dbToColor(r.db, minDb, maxDb);
     const span = document.createElement("span");
@@ -227,6 +227,28 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
     span.style.lineHeight = "1.05";
     span.style.color = color;
     span.style.marginRight = `${clamp(Math.round(size * 0.18), 6, 48)}px`;
+    
+    // Add data attributes for tooltip
+    span.setAttribute('data-word', r.word);
+    span.setAttribute('data-index', index + 1);
+    span.setAttribute('data-start', r.start.toFixed(2));
+    span.setAttribute('data-end', r.end.toFixed(2));
+    span.setAttribute('data-db', (r.dbMean ?? r.db).toFixed(1));
+    span.setAttribute('data-db-max', (r.dbMax ?? r.db).toFixed(1));
+    span.setAttribute('data-size', size);
+    
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'word-tooltip';
+    tooltip.innerHTML = `
+      <div class="tooltip-row"><strong>#${index + 1}:</strong> ${escapeHtml(r.word)}</div>
+      <div class="tooltip-row"><strong>Time:</strong> ${r.start.toFixed(2)}s - ${r.end.toFixed(2)}s</div>
+      <div class="tooltip-row"><strong>dB Mean:</strong> ${(r.dbMean ?? r.db).toFixed(1)} dB</div>
+      <div class="tooltip-row"><strong>dB Max:</strong> ${(r.dbMax ?? r.db).toFixed(1)} dB</div>
+      <div class="tooltip-row"><strong>Font Size:</strong> ${size}px</div>
+    `;
+    span.appendChild(tooltip);
+    
     container.appendChild(span);
   });
 }
