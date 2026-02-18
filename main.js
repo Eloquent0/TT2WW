@@ -4,8 +4,6 @@ let dbTimeline = [];
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
-let updatePlayButtonState = null; // assigned in DOMContentLoaded
-
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -15,38 +13,27 @@ function tokenize(text) {
   return (text || "").trim().split(/\s+/).filter(Boolean);
 }
 
-// ---------- Parse timestamp format (time on one line, words on next) ----------
 function parseTimestampedText(text) {
   const lines = text.trim().split('\n').filter(l => l.trim());
   const segments = [];
-  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    
-    // Check if this line is a timestamp (format: M:SS or MM:SS)
     const timeMatch = line.match(/^(\d{1,2}):(\d{2})$/);
     if (timeMatch && i + 1 < lines.length) {
       const minutes = parseInt(timeMatch[1]);
       const seconds = parseInt(timeMatch[2]);
       const timeInSeconds = minutes * 60 + seconds;
       const words = lines[i + 1].trim();
-      
-      if (words) {
-        segments.push({ time: timeInSeconds, words });
-      }
-      i++; // Skip the next line since we already processed it
+      if (words) { segments.push({ time: timeInSeconds, words }); }
+      i++;
     }
   }
-  
   return segments;
 }
 
-// ---------- Create word rows from timestamped segments ----------
 function makeTimestampsFromSegments(segments, durationSec) {
   if (!segments.length) return [];
-  
   const rows = [];
-  
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     const words = tokenize(seg.words);
@@ -54,14 +41,12 @@ function makeTimestampsFromSegments(segments, durationSec) {
     const endTime = i + 1 < segments.length ? segments[i + 1].time : durationSec;
     const segDuration = endTime - startTime;
     const wordDuration = words.length > 0 ? segDuration / words.length : 0;
-    
     words.forEach((word, idx) => {
       const start = startTime + (idx * wordDuration);
       const end = Math.min(startTime + ((idx + 1) * wordDuration), endTime);
       rows.push({ word, start, end });
     });
   }
-  
   return rows;
 }
 
@@ -80,7 +65,6 @@ function getAudioAmplitudeAtTime(time) {
   return sum / audioBuffer.numberOfChannels;
 }
 
-// ---------- dB → size ----------
 function mapDbToSize(db, minDb, maxDb, mode = "neutral", minPx = 14, maxPx = 120) {
   if (maxDb === minDb) return minPx;
   let t = clamp((db - minDb) / (maxDb - minDb), 0, 1);
@@ -89,7 +73,6 @@ function mapDbToSize(db, minDb, maxDb, mode = "neutral", minPx = 14, maxPx = 120
   return Math.round(lerp(minPx, maxPx, t));
 }
 
-// ---------- Build dB timeline ----------
 function buildDbTimeline(durationSec, minDb, maxDb) {
   const step = 0.05;
   const samples = [];
@@ -101,17 +84,14 @@ function buildDbTimeline(durationSec, minDb, maxDb) {
   return samples;
 }
 
-// ---------- Word timestamps — duration passed directly, never relies on global ----------
 function makeTimestamps(words, durationSec) {
   const n = words.length;
   if (n === 0) return [];
-
   const PAUSE_DURATION = 0.15;
   const PUNCTUATION = /[.,!?;:]$/;
   const pauseCount = words.filter(w => PUNCTUATION.test(w)).length;
   const usable = Math.max(0.1, durationSec - pauseCount * PAUSE_DURATION);
   const wordDur = usable / n;
-
   const rows = [];
   let t = 0;
   for (const word of words) {
@@ -122,29 +102,23 @@ function makeTimestamps(words, durationSec) {
     if (PUNCTUATION.test(word)) t = Math.min(durationSec, t + PAUSE_DURATION);
     if (t >= durationSec) break;
   }
-
   if (rows.length) rows[rows.length - 1].end = durationSec;
   return rows;
 }
 
-// ---------- Assign dB to words (with multiple calculation modes) ----------
 function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
   const SILENCE_FLOOR = -60;
-  
   return wordRows.map(row => {
     const samples = dbTimeline
       .filter(s => s.t >= row.start && s.t <= row.end)
       .filter(s => Number.isFinite(s.db));
-
     if (!samples.length) {
       const v = clamp(SILENCE_FLOOR, minDb, maxDb);
       return { ...row, db: v, dbMean: v, dbMax: v };
     }
-
     let db;
     const dbMean = samples.reduce((sum, s) => sum + s.db, 0) / samples.length;
     const dbMax = Math.max(...samples.map(s => s.db));
-    
     switch(method) {
       case 'rms': {
         const linearValues = samples.map(s => Math.pow(10, s.db / 20));
@@ -183,24 +157,16 @@ function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
       default:
         db = clamp(dbMean, minDb, maxDb);
     }
-
-    return {
-      ...row,
-      db: db,
-      dbMean: clamp(dbMean, minDb, maxDb),
-      dbMax: clamp(dbMax, minDb, maxDb)
-    };
+    return { ...row, db, dbMean: clamp(dbMean, minDb, maxDb), dbMax: clamp(dbMax, minDb, maxDb) };
   });
 }
 
-// ---------- Color ----------
 function dbToColor(db, minDb, maxDb) {
   if (maxDb === minDb) return "rgb(100,100,255)";
   const t = clamp(Math.pow((db - minDb) / (maxDb - minDb), 0.6), 0, 1);
   return `rgb(${Math.round(100 + 155 * t)},${Math.round(150 - 70 * t)},${Math.round(255 - 175 * t)})`;
 }
 
-// ---------- Render ----------
 function escapeHtml(str) {
   return str.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
             .replaceAll('"',"&quot;").replaceAll("'","&#039;");
@@ -219,7 +185,6 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
     span.style.lineHeight = "1.05";
     span.style.color = color;
     span.style.marginRight = `${clamp(Math.round(size * 0.18), 6, 48)}px`;
-    
     span.setAttribute('data-word', r.word);
     span.setAttribute('data-index', index + 1);
     span.setAttribute('data-start', r.start.toFixed(2));
@@ -227,7 +192,6 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
     span.setAttribute('data-db', (r.dbMean ?? r.db).toFixed(1));
     span.setAttribute('data-db-max', (r.dbMax ?? r.db).toFixed(1));
     span.setAttribute('data-size', size);
-    
     const tooltip = document.createElement('div');
     tooltip.className = 'word-tooltip';
     tooltip.innerHTML = `
@@ -261,7 +225,6 @@ function renderTable(rows, minDb, maxDb, mode = "neutral") {
   });
 }
 
-// ---------- CSV ----------
 function rowsToCsv(rows, minDb, maxDb, mode = "neutral") {
   const lines = ["index,word,start,end,dbMean,dbMax,font_px"];
   rows.forEach((r, i) => {
@@ -287,7 +250,6 @@ function downloadTextFile(filename, content, mime = "text/plain") {
   a.remove(); URL.revokeObjectURL(url);
 }
 
-// ---------- Scrub ----------
 function setScrubUI(durationSec) {
   const scrub = document.getElementById("scrub");
   scrub.min = "0"; scrub.max = String(durationSec); scrub.value = "0";
@@ -300,7 +262,6 @@ function getDbAtTime(t) {
   return dbTimeline[clamp(Math.round(t / 0.05), 0, dbTimeline.length - 1)].db;
 }
 
-// ---------- Main runner ----------
 async function runMachine() {
   const status = document.getElementById("status");
   const minDb = Number(document.getElementById("minDb").value);
@@ -327,17 +288,12 @@ async function runMachine() {
     dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
 
     status.textContent = "📝 Tokenizing + timestamping...";
-    
     const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
     let wordRows;
-    
     if (hasTimestamps) {
       const segments = parseTimestampedText(text);
-      if (segments.length === 0) {
-        status.textContent = "❌ No valid timestamps found."; return;
-      }
+      if (segments.length === 0) { status.textContent = "❌ No valid timestamps found."; return; }
       wordRows = makeTimestampsFromSegments(segments, durationSec);
-      status.textContent = `📝 Parsed ${segments.length} timestamped segments...`;
     } else {
       const words = tokenize(text);
       wordRows = makeTimestamps(words, durationSec);
@@ -357,11 +313,11 @@ async function runMachine() {
 
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
 
-    // Enable play button now that rows are ready
     const playBtn = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
     if (playBtn) { playBtn.disabled = false; playBtn.textContent = "▶ Play"; }
     if (resetBtn) resetBtn.disabled = false;
+
   } catch (err) {
     console.error("runMachine error:", err);
     status.textContent = `❌ Error: ${err.message}`;
@@ -371,163 +327,97 @@ async function runMachine() {
   }
 }
 
-// ---------- Auth UI ----------
 function updateAuthUI() {
-  const emailInput = document.getElementById("emailInput");
-  const loginBtn   = document.getElementById("loginBtn");
-  const logoutBtn  = document.getElementById("logoutBtn");
-  const authInfo   = document.getElementById("authInfo");
+  const loggedIn = typeof currentUser !== 'undefined' && !!currentUser;
+  const emailInput  = document.getElementById("emailInput");
+  const loginBtn    = document.getElementById("loginBtn");
+  const logoutBtn   = document.getElementById("logoutBtn");
+  const authInfo    = document.getElementById("authInfo");
   const saveDraftBtn = document.getElementById("saveDraftBtn");
   const publishBtn   = document.getElementById("publishBtn");
   const galleryBtn   = document.getElementById("galleryBtn");
-
-  if (currentUser) {
-    if (emailInput) emailInput.style.display = "none";
-    if (loginBtn)   loginBtn.style.display   = "none";
-    if (logoutBtn)  logoutBtn.style.display  = "inline-block";
-    if (authInfo)  { authInfo.textContent = currentUser.email; authInfo.style.display = "inline-block"; }
-    if (saveDraftBtn) saveDraftBtn.disabled = false;
-    if (publishBtn)   publishBtn.disabled   = false;
-    if (galleryBtn)   galleryBtn.style.display = "inline-block";
-  } else {
-    if (emailInput) emailInput.style.display = "inline-block";
-    if (loginBtn)   loginBtn.style.display   = "inline-block";
-    if (logoutBtn)  logoutBtn.style.display  = "none";
-    if (authInfo)  { authInfo.textContent = ""; authInfo.style.display = "none"; }
-    if (saveDraftBtn) saveDraftBtn.disabled = true;
-    if (publishBtn)   publishBtn.disabled   = true;
-    if (galleryBtn)   galleryBtn.style.display = "none";
-  }
+  if (emailInput)   emailInput.style.display   = loggedIn ? "none" : "inline-block";
+  if (loginBtn)     loginBtn.style.display     = loggedIn ? "none" : "inline-block";
+  if (logoutBtn)    logoutBtn.style.display    = loggedIn ? "inline-block" : "none";
+  if (galleryBtn)   galleryBtn.style.display   = loggedIn ? "inline-block" : "none";
+  if (authInfo)   { authInfo.textContent = loggedIn ? currentUser.email : ""; authInfo.style.display = loggedIn ? "inline-block" : "none"; }
+  if (saveDraftBtn) saveDraftBtn.disabled = !loggedIn;
+  if (publishBtn)   publishBtn.disabled   = !loggedIn;
 }
 
-// ---------- Save to Supabase ----------
 async function saveCreation({ isPublic }) {
-  if (!supabase) return alert("Supabase not connected.");
+  if (typeof supabase === 'undefined' || !supabase) return alert("Supabase not connected.");
   if (!currentUser) return alert("Please log in first.");
   if (!currentRows.length) return alert("Generate something first.");
-
   const status = document.getElementById("status");
   status.textContent = "💾 Saving...";
-
   try {
     const minDb = Number(document.getElementById("minDb").value);
     const maxDb = Number(document.getElementById("maxDb").value);
     const mode  = document.getElementById("mapMode")?.value || "neutral";
-
-    const payload = {
-      version: "1.0",
-      data: {
-        words: currentRows,
-        mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode }
-      }
-    };
-
+    const payload = { version: "1.0", data: { words: currentRows, mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode } } };
     const { data: created, error: insertErr } = await supabase
       .from("creations")
       .insert({ user_id: currentUser.id, title: "TT2WW", is_public: isPublic, data_json: payload })
       .select("id").single();
-
     if (insertErr) throw insertErr;
-
     const shareUrl = `${window.location.origin}${window.location.pathname}?c=${created.id}`;
     status.textContent = `✅ Saved! ${isPublic ? "Public" : "Private"}`;
-
     if (isPublic) {
       const modal = document.createElement("div");
       modal.className = "modal";
-      modal.innerHTML = `
-        <div class="modal-content">
-          <h2>✅ Published!</h2>
-          <p>Your creation is now public.</p>
-          <div class="share-link">
-            <input type="text" value="${shareUrl}" readonly id="shareUrl">
-            <button onclick="navigator.clipboard.writeText(document.getElementById('shareUrl').value).then(()=>alert('Copied!'))" class="btn">Copy Link</button>
-          </div>
-          <button onclick="this.closest('.modal').remove()" class="btn primary" style="margin-top:12px">Close</button>
-        </div>`;
+      modal.innerHTML = `<div class="modal-content">
+        <h2>✅ Published!</h2><p>Your creation is now public.</p>
+        <div class="share-link">
+          <input type="text" value="${shareUrl}" readonly id="shareUrl">
+          <button onclick="navigator.clipboard.writeText(document.getElementById('shareUrl').value).then(()=>alert('Copied!'))" class="btn">Copy Link</button>
+        </div>
+        <button onclick="this.closest('.modal').remove()" class="btn primary" style="margin-top:12px">Close</button>
+      </div>`;
       document.body.appendChild(modal);
     }
-  } catch (err) {
-    status.textContent = `❌ Save failed: ${err.message}`;
-    console.error(err);
-  }
+  } catch (err) { status.textContent = `❌ Save failed: ${err.message}`; console.error(err); }
 }
 
-// ---------- Gallery ----------
 async function showGallery() {
-  if (!supabase) return alert("Supabase not connected.");
-
+  if (typeof supabase === 'undefined' || !supabase) return alert("Supabase not connected.");
   const modal = document.createElement("div");
   modal.className = "modal gallery-modal";
-  modal.innerHTML = `
-    <div class="modal-content gallery-content">
-      <div class="gallery-header">
-        <h2>🎨 Public Creations</h2>
-        <button onclick="this.closest('.modal').remove()" class="btn ghost">✕</button>
-      </div>
-      <div id="galleryGrid" class="gallery-grid"><p>Loading...</p></div>
-    </div>`;
+  modal.innerHTML = `<div class="modal-content gallery-content">
+    <div class="gallery-header"><h2>🎨 Public Creations</h2>
+    <button onclick="this.closest('.modal').remove()" class="btn ghost">✕</button></div>
+    <div id="galleryGrid" class="gallery-grid"><p>Loading...</p></div></div>`;
   document.body.appendChild(modal);
-
   try {
-    const { data, error } = await supabase
-      .from("creations")
-      .select("id, title, created_at")
-      .eq("is_public", true)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
+    const { data, error } = await supabase.from("creations").select("id, title, created_at")
+      .eq("is_public", true).order("created_at", { ascending: false }).limit(50);
     const grid = document.getElementById("galleryGrid");
-    if (error || !data?.length) {
-      grid.innerHTML = "<p>No public creations yet. Be the first to share!</p>";
-      return;
-    }
-
+    if (error || !data?.length) { grid.innerHTML = "<p>No public creations yet.</p>"; return; }
     grid.innerHTML = "";
     data.forEach(item => {
-      const card = document.createElement("div");
-      card.className = "gallery-card";
+      const card = document.createElement("div"); card.className = "gallery-card";
       const date = new Date(item.created_at).toLocaleDateString();
-      card.innerHTML = `
-        <div class="gallery-info">
-          <h3>${escapeHtml(item.title)}</h3>
-          <p>${date}</p>
-          <button class="btn" onclick="
-            this.closest('.modal').remove();
-            const u = new URL(window.location);
-            u.searchParams.set('c','${item.id}');
-            window.location = u.toString();
-          ">View</button>
+      card.innerHTML = `<div class="gallery-info"><h3>${escapeHtml(item.title)}</h3><p>${date}</p>
+        <button class="btn" onclick="this.closest('.modal').remove();const u=new URL(window.location);u.searchParams.set('c','${item.id}');window.location=u.toString();">View</button>
         </div>`;
       grid.appendChild(card);
     });
-  } catch (err) {
-    document.getElementById("galleryGrid").innerHTML = `<p>Error: ${err.message}</p>`;
-  }
+  } catch (err) { document.getElementById("galleryGrid").innerHTML = `<p>Error: ${err.message}</p>`; }
 }
 
-// ---------- Load shared creation from URL ----------
 async function maybeLoadShared() {
-  if (!supabase) return;
+  if (typeof supabase === 'undefined' || !supabase) return;
   const id = new URLSearchParams(window.location.search).get("c");
   if (!id) return;
-
   const status = document.getElementById("status");
   status.textContent = "📥 Loading shared creation...";
-
   try {
-    const { data, error } = await supabase
-      .from("creations")
-      .select("data_json, is_public, title")
-      .eq("id", id)
-      .single();
-
+    const { data, error } = await supabase.from("creations")
+      .select("data_json, is_public, title").eq("id", id).single();
     if (error) throw error;
     if (!data.is_public) { status.textContent = "❌ This creation is private."; return; }
-
     const { data: { words, mapping } } = data.data_json;
     const { minDb, maxDb, mode } = mapping;
-
     currentRows = words;
     renderWords(currentRows, minDb, maxDb, mode);
     renderTable(currentRows, minDb, maxDb, mode);
@@ -535,105 +425,68 @@ async function maybeLoadShared() {
     document.getElementById("maxDb").value = maxDb;
     if (document.getElementById("mapMode")) document.getElementById("mapMode").value = mode;
     status.textContent = `✅ Loaded: ${data.title}`;
-  } catch (err) {
-    status.textContent = `❌ Failed to load: ${err.message}`;
-  }
+  } catch (err) { status.textContent = `❌ Failed to load: ${err.message}`; }
 }
 
 // ---------- DOM wiring ----------
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
-  // --- Version Details ---
   const versionDetails = document.getElementById("versionDetails");
   let animationTimer = null;
-
   if (versionDetails) {
     const summary = versionDetails.querySelector("summary");
     if (summary) {
       summary.addEventListener("click", (e) => {
         e.preventDefault();
-        if (animationTimer !== null) {
-          clearTimeout(animationTimer);
-          animationTimer = null;
-          const interrupted = versionDetails.dataset.state;
-          if (interrupted === "closing") versionDetails.open = false;
-          versionDetails.removeAttribute("data-state");
-        }
+        if (animationTimer !== null) { clearTimeout(animationTimer); animationTimer = null; }
         const isOpen = versionDetails.open;
         if (isOpen) {
           versionDetails.dataset.state = "closing";
-          animationTimer = setTimeout(() => {
-            versionDetails.open = false;
-            versionDetails.removeAttribute("data-state");
-            animationTimer = null;
-          }, 300);
+          animationTimer = setTimeout(() => { versionDetails.open = false; versionDetails.removeAttribute("data-state"); animationTimer = null; }, 300);
         } else {
-          versionDetails.open = true;
-          void versionDetails.offsetHeight;
+          versionDetails.open = true; void versionDetails.offsetHeight;
           versionDetails.dataset.state = "opening";
-          animationTimer = setTimeout(() => {
-            versionDetails.removeAttribute("data-state");
-            animationTimer = null;
-          }, 300);
+          animationTimer = setTimeout(() => { versionDetails.removeAttribute("data-state"); animationTimer = null; }, 300);
         }
       });
     }
   }
 
-  // --- Copy output text ---
   const copyOutputBtn = document.getElementById("copyOutputBtn");
   if (copyOutputBtn) {
     copyOutputBtn.addEventListener("click", async () => {
-      const wordOutput = document.getElementById("wordOutput");
-      if (!wordOutput) return;
-      
+      const wordOutput = document.getElementById("wordOutput"); if (!wordOutput) return;
       const clone = wordOutput.cloneNode(true);
       clone.querySelectorAll('.word-tooltip').forEach(tooltip => tooltip.remove());
       const words = clone.querySelectorAll('.word');
-      words.forEach((word, index) => {
-        if (index < words.length - 1) word.after(document.createTextNode(' '));
-      });
+      words.forEach((word, index) => { if (index < words.length - 1) word.after(document.createTextNode(' ')); });
       const htmlContent = clone.innerHTML;
-      const plainText = Array.from(wordOutput.querySelectorAll('.word'))
-        .map(span => span.getAttribute('data-word') || '')
-        .filter(text => text)
-        .join(' ');
-      
+      const plainText = Array.from(wordOutput.querySelectorAll('.word')).map(span => span.getAttribute('data-word') || '').filter(t => t).join(' ');
       try {
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            'text/html': new Blob([htmlContent], { type: 'text/html' }),
-            'text/plain': new Blob([plainText], { type: 'text/plain' })
-          })
-        ]);
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([htmlContent], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' })
+        })]);
         const originalText = copyOutputBtn.textContent;
         copyOutputBtn.textContent = '✅ Copied!';
         setTimeout(() => { copyOutputBtn.textContent = originalText; }, 2000);
-      } catch (err) {
-        console.error('Copy failed:', err);
-        alert('Failed to copy');
-      }
+      } catch (err) { console.error('Copy failed:', err); alert('Failed to copy'); }
     });
   }
 
-  // --- Startup diagnostics ---
   if (!window.AudioContext && !window.webkitAudioContext) {
-    status.textContent = "❌ Web Audio API not supported in this browser.";
-    return;
+    status.textContent = "❌ Web Audio API not supported in this browser."; return;
   }
   if (window.location.protocol === "file:") {
-    status.textContent = "❌ Must run from a server, not file://. In VS Code: right-click index.html → Open with Live Server.";
-    status.classList.remove("flashing");
-    return;
+    status.textContent = "❌ Must run from a server. Use Live Server in VS Code.";
+    status.classList.remove("flashing"); return;
   }
 
-  // --- File upload ---
   const fileInput = document.getElementById("wavFileInput");
   if (fileInput) {
     fileInput.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+      const file = e.target.files?.[0]; if (!file) return;
       status.textContent = "⏳ Loading audio...";
       try {
         if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -643,9 +496,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentAudioFile = file;
         const duration = audioBuffer.duration;
         if (duration > 300 || duration <= 0) {
-          status.textContent = duration > 300
-            ? `❌ File too long: ${duration.toFixed(2)}s (max 5 min)`
-            : "❌ Invalid audio duration.";
+          status.textContent = duration > 300 ? `❌ File too long (max 5 min)` : "❌ Invalid audio duration.";
           audioBuffer = null; currentAudioFile = null; e.target.value = ""; return;
         }
         const durEl = document.getElementById("durationSec");
@@ -653,91 +504,60 @@ document.addEventListener("DOMContentLoaded", () => {
         status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate.`;
         status.classList.remove("flashing");
       } catch (err) {
-        status.textContent = `❌ ${err.message || "Could not decode audio. Try a WAV or MP3."}`;
+        status.textContent = `❌ ${err.message || "Could not decode audio."}`;
         audioBuffer = null; currentAudioFile = null; e.target.value = "";
       }
     });
   }
 
-  // --- Generate ---
-  const generateBtnEl = document.getElementById("generateBtn");
-  if (generateBtnEl) generateBtnEl.addEventListener("click", runMachine);
+  document.getElementById("generateBtn")?.addEventListener("click", runMachine);
 
-  // --- Download CSV ---
-  const downloadBtn = document.getElementById("downloadCsvBtn");
-  if (downloadBtn) {
-    downloadBtn.addEventListener("click", () => {
-      const minDb = Number(document.getElementById("minDb").value);
-      const maxDb = Number(document.getElementById("maxDb").value);
-      const mode  = document.getElementById("mapMode")?.value || "neutral";
-      if (!currentRows.length) { status.textContent = "Nothing to download — Generate first."; return; }
-      downloadTextFile("tt2ww_data.csv", rowsToCsv(currentRows, minDb, maxDb, mode), "text/csv");
-    });
-  }
+  document.getElementById("downloadCsvBtn")?.addEventListener("click", () => {
+    const minDb = Number(document.getElementById("minDb").value);
+    const maxDb = Number(document.getElementById("maxDb").value);
+    const mode  = document.getElementById("mapMode")?.value || "neutral";
+    if (!currentRows.length) { status.textContent = "Nothing to download — Generate first."; return; }
+    downloadTextFile("tt2ww_data.csv", rowsToCsv(currentRows, minDb, maxDb, mode), "text/csv");
+  });
 
-  // --- Scrub ---
-  const scrub = document.getElementById("scrub");
-  if (scrub) {
-    scrub.addEventListener("input", (e) => {
-      const t = Number(e.target.value);
-      document.getElementById("scrubTime").textContent = `${t.toFixed(2)}s`;
-      const db = getDbAtTime(t);
-      document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : "— dB";
-    });
-  }
+  document.getElementById("scrub")?.addEventListener("input", (e) => {
+    const t = Number(e.target.value);
+    document.getElementById("scrubTime").textContent = `${t.toFixed(2)}s`;
+    const db = getDbAtTime(t);
+    document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : "— dB";
+  });
 
-  // --- Auth ---
-  if (supabase) {
+  // Auth — only wire up if supabase exists
+  if (typeof supabase !== 'undefined' && supabase) {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      currentUser = session?.user || null;
-      updateAuthUI();
+      window.currentUser = session?.user || null; updateAuthUI();
     });
     supabase.auth.onAuthStateChange((event, session) => {
-      currentUser = session?.user || null;
-      updateAuthUI();
-      if (event === "SIGNED_IN") status.textContent = `✅ Logged in as ${currentUser.email}`;
+      window.currentUser = session?.user || null; updateAuthUI();
+      if (event === "SIGNED_IN")  status.textContent = `✅ Logged in as ${currentUser.email}`;
       if (event === "SIGNED_OUT") status.textContent = "Logged out.";
     });
     maybeLoadShared();
-  }
 
-  const loginBtn = document.getElementById("loginBtn");
-  if (loginBtn) {
-    loginBtn.addEventListener("click", async () => {
-      if (!supabase) return alert("Supabase not connected.");
+    document.getElementById("loginBtn")?.addEventListener("click", async () => {
       const email = document.getElementById("emailInput")?.value.trim();
       if (!email) return alert("Enter your email.");
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin }
-      });
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
       if (error) return alert(error.message);
       alert("✅ Check your email for the magic link!");
     });
+    document.getElementById("logoutBtn")?.addEventListener("click",   async () => { await supabase.auth.signOut(); });
+    document.getElementById("saveDraftBtn")?.addEventListener("click", () => saveCreation({ isPublic: false }));
+    document.getElementById("publishBtn")?.addEventListener("click",   () => saveCreation({ isPublic: true }));
+    document.getElementById("galleryBtn")?.addEventListener("click",   showGallery);
   }
 
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) logoutBtn.addEventListener("click", async () => {
-    if (supabase) await supabase.auth.signOut();
-  });
-
-  const saveDraftBtn = document.getElementById("saveDraftBtn");
-  if (saveDraftBtn) saveDraftBtn.addEventListener("click", () => saveCreation({ isPublic: false }));
-
-  const publishBtn = document.getElementById("publishBtn");
-  if (publishBtn) publishBtn.addEventListener("click", () => saveCreation({ isPublic: true }));
-
-  const galleryBtn = document.getElementById("galleryBtn");
-  if (galleryBtn) galleryBtn.addEventListener("click", showGallery);
-
-  // =====================================================
-  // --- Play Animation: simple setTimeout per word ---
-  // =====================================================
-
-  let activeTimeouts = [];   // so Reset can cancel them
+  // ── Animation ──────────────────────────────────────────────────────────────
+  let activeTimeouts = [];
   let animRunning = false;
 
   function playAnimation() {
+    if (animRunning) return;
     if (!currentRows.length) return;
 
     const words = Array.from(document.querySelectorAll("#wordOutput .word"));
@@ -746,22 +566,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
 
-    // Hide every word immediately, no transition
-    words.forEach(w => { w.style.transition = "none"; w.style.opacity = "0"; });
-
+    activeTimeouts.forEach(id => clearTimeout(id));
+    activeTimeouts = [];
     animRunning = true;
+
     if (playBtn)  { playBtn.textContent = "▶ Playing…"; playBtn.disabled = true; }
     if (resetBtn) resetBtn.disabled = true;
 
-    // Schedule each word to appear at its start time (ms)
-    activeTimeouts = currentRows.map((row, i) => {
-      return setTimeout(() => {
-        if (words[i]) words[i].style.opacity = "1";
+    // hide all words instantly
+    words.forEach(w => { w.style.transition = "none"; w.style.opacity = "0"; });
+
+    // reveal each word at its timestamp
+    currentRows.forEach((row, i) => {
+      const id = setTimeout(() => {
+        if (words[i]) {
+          words[i].style.transition = "opacity 0.15s ease";
+          words[i].style.opacity = "1";
+        }
       }, row.start * 1000);
+      activeTimeouts.push(id);
     });
 
-    // When the last word has appeared, re-enable buttons
-    const totalMs = currentRows[currentRows.length - 1].start * 1000 + 300;
+    // done
+    const totalMs = currentRows[currentRows.length - 1].start * 1000 + 500;
     activeTimeouts.push(setTimeout(() => {
       animRunning = false;
       if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
@@ -770,34 +597,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetAnimation() {
-    // Cancel every pending timeout
     activeTimeouts.forEach(id => clearTimeout(id));
     activeTimeouts = [];
     animRunning = false;
-
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
     if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
     if (resetBtn) resetBtn.disabled = false;
-
-    // Show all words
     document.querySelectorAll("#wordOutput .word").forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "1";
     });
   }
 
-  const playAnimationBtn = document.getElementById("playAnimationBtn");
-  if (playAnimationBtn) {
-    playAnimationBtn.addEventListener("click", playAnimation);
-  }
+  document.getElementById("playAnimationBtn")?.addEventListener("click", playAnimation);
+  document.getElementById("resetAnimationBtn")?.addEventListener("click", resetAnimation);
 
-  const resetAnimationBtn = document.getElementById("resetAnimationBtn");
-  if (resetAnimationBtn) {
-    resetAnimationBtn.addEventListener("click", resetAnimation);
-  }
-
-  // Initial state
   status.textContent = "Upload an audio file to begin.";
-  updatePlayButtonState();
+  // ← removed the updatePlayButtonState() call that was crashing here
 });
