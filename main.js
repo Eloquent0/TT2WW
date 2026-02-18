@@ -6,12 +6,14 @@ let currentUser = null;
 
 try {
   if (window.supabase && SUPABASE_ANON_KEY.startsWith("eyJ")) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { createClient } = window.supabase;   // add this line
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log("✅ Supabase initialized");
   }
 } catch (e) {
   console.warn("⚠️ Supabase init failed:", e.message);
 }
+
 
 // ---------- State ----------
 let currentRows = [];
