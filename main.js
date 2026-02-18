@@ -4,6 +4,7 @@ let dbTimeline = [];
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
+let updatePlayButtonState = null; // Will be assigned in DOMContentLoaded
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -367,7 +368,7 @@ async function runMachine() {
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
     
     // Update play button state
-    if (typeof updatePlayButtonState === 'function') updatePlayButtonState();
+    if (updatePlayButtonState) updatePlayButtonState();
   } catch (err) {
     console.error("runMachine error:", err);
     status.textContent = `❌ Error: ${err.message}`;
@@ -713,7 +714,7 @@ if (versionDetails) {
   const textInput = document.getElementById("textInput");
   if (textInput) {
     textInput.addEventListener("input", () => {
-      if (typeof updatePlayButtonState === 'function') updatePlayButtonState();
+      if (updatePlayButtonState) updatePlayButtonState();
     });
   }
 
@@ -792,7 +793,7 @@ if (versionDetails) {
   let animationInterval = null;
   let isAnimationPlaying = false;
   
-  function updatePlayButtonState() {
+  updatePlayButtonState = function() {
     const playAnimationBtn = document.getElementById("playAnimationBtn");
     if (!playAnimationBtn) return;
     
@@ -804,7 +805,7 @@ if (versionDetails) {
     } else {
       playAnimationBtn.disabled = false;
     }
-  }
+  };
   
   const playAnimationBtn = document.getElementById("playAnimationBtn");
   if (playAnimationBtn) {
@@ -843,24 +844,28 @@ if (versionDetails) {
       isAnimationPlaying = true;
       playAnimationBtn.textContent = "⏸️ Pause Animation";
       
+      console.log('Starting animation with', currentRows.length, 'words');
+      console.log('First 5 rows:', currentRows.slice(0, 5).map(r => ({ word: r.word, start: r.start })));
+      console.log('Word elements count:', words.length);
+      
       // Hide all words initially
-      words.forEach(word => {
+      words.forEach((word, idx) => {
         word.style.opacity = "0";
         word.style.transition = "opacity 0.3s ease-in";
       });
       
+      console.log('All words hidden, starting animation...');
+      
       // Animate words based on their timing
       let currentIndex = 0;
       const startTime = Date.now();
-      
-      console.log('Starting animation with', currentRows.length, 'words');
-      console.log('First few rows:', currentRows.slice(0, 5));
       
       animationInterval = setInterval(() => {
         if (currentIndex >= currentRows.length) {
           clearInterval(animationInterval);
           isAnimationPlaying = false;
           playAnimationBtn.textContent = "▶️ Play Animation";
+          console.log('Animation complete');
           return;
         }
         
@@ -870,6 +875,7 @@ if (versionDetails) {
         while (currentIndex < currentRows.length && currentRows[currentIndex].start <= elapsed) {
           if (words[currentIndex]) {
             words[currentIndex].style.opacity = "1";
+            console.log(`Showing word ${currentIndex}: "${currentRows[currentIndex].word}" at ${elapsed.toFixed(2)}s (start: ${currentRows[currentIndex].start})`);
           }
           currentIndex++;
         }
