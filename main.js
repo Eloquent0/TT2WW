@@ -308,6 +308,9 @@ async function runMachine() {
   const mode = document.getElementById("mapMode")?.value || "neutral";
   const volumeMethod = document.getElementById("volumeMethod")?.value || "rms";
 
+  const generateBtn = document.getElementById("generateBtn");
+  if (generateBtn) { generateBtn.disabled = true; generateBtn.textContent = "Generating…"; }
+
   try {
     if (!audioBuffer) { status.textContent = "❌ Please upload an audio file first."; return; }
     if (!(maxDb > minDb)) { status.textContent = "❌ Max dB must be greater than Min dB."; return; }
@@ -362,6 +365,9 @@ async function runMachine() {
   } catch (err) {
     console.error("runMachine error:", err);
     status.textContent = `❌ Error: ${err.message}`;
+  } finally {
+    const btn = document.getElementById("generateBtn");
+    if (btn) { btn.disabled = false; btn.textContent = "Generate"; }
   }
 }
 
@@ -654,8 +660,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Generate ---
-  const generateBtn = document.getElementById("generateBtn");
-  if (generateBtn) generateBtn.addEventListener("click", runMachine);
+  const generateBtnEl = document.getElementById("generateBtn");
+  if (generateBtnEl) generateBtnEl.addEventListener("click", runMachine);
 
   // --- Download CSV ---
   const downloadBtn = document.getElementById("downloadCsvBtn");
