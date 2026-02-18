@@ -525,29 +525,48 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Version changelog auto-close ---
   const versionDetails = document.getElementById("versionDetails");
   let closeTimer = null;
+  let isAnimating = false;
   
   if (versionDetails) {
-    versionDetails.addEventListener("toggle", () => {
-      if (versionDetails.open) {
-        // Remove closing class when opening
-        versionDetails.classList.remove('closing');
-        // Clear any existing timer
-        if (closeTimer) clearTimeout(closeTimer);
-        // Set new timer to close after 5 seconds
-        closeTimer = setTimeout(() => {
-          // Add closing class to trigger animation
+    // Override default toggle to add animation
+    const summary = versionDetails.querySelector('summary');
+    if (summary) {
+      summary.addEventListener("click", (e) => {
+        if (isAnimating) return;
+        e.preventDefault();
+        
+        if (versionDetails.open) {
+          // Closing - trigger animation first
+          isAnimating = true;
           versionDetails.classList.add('closing');
-          // Wait for animation to complete, then actually close
           setTimeout(() => {
             versionDetails.open = false;
             versionDetails.classList.remove('closing');
-          }, 300); // Match animation duration
-        }, 5000);
-      } else {
-        // Clear timer if manually closed
-        if (closeTimer) clearTimeout(closeTimer);
-      }
-    });
+            isAnimating = false;
+          }, 300);
+          if (closeTimer) clearTimeout(closeTimer);
+        } else {
+          // Opening
+          versionDetails.open = true;
+          versionDetails.classList.remove('closing');
+          // Clear any existing timer
+          if (closeTimer) clearTimeout(closeTimer);
+          // Set new timer to close after 5 seconds
+          closeTimer = setTimeout(() => {
+            if (!versionDetails.open) return;
+            // Add closing class to trigger animation
+            isAnimating = true;
+            versionDetails.classList.add('closing');
+            // Wait for animation to complete, then actually close
+            setTimeout(() => {
+              versionDetails.open = false;
+              versionDetails.classList.remove('closing');
+              isAnimating = false;
+            }, 300); // Match animation duration
+          }, 5000);
+        }
+      });
+    }
   }
 
   // --- Startup diagnostics ---
