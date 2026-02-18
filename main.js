@@ -522,6 +522,26 @@ async function maybeLoadShared() {
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
+  // --- Version changelog auto-close ---
+  const versionDetails = document.getElementById("versionDetails");
+  let closeTimer = null;
+  
+  if (versionDetails) {
+    versionDetails.addEventListener("toggle", () => {
+      if (versionDetails.open) {
+        // Clear any existing timer
+        if (closeTimer) clearTimeout(closeTimer);
+        // Set new timer to close after 5 seconds
+        closeTimer = setTimeout(() => {
+          versionDetails.open = false;
+        }, 5000);
+      } else {
+        // Clear timer if manually closed
+        if (closeTimer) clearTimeout(closeTimer);
+      }
+    });
+  }
+
   // --- Startup diagnostics ---
   if (!window.AudioContext && !window.webkitAudioContext) {
     status.textContent = "❌ Web Audio API not supported in this browser.";
