@@ -362,11 +362,19 @@ async function runMachine() {
 
     status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
 
-    // Reset animation to clean state after every generate
-    if (animStopFn) animStopFn();
+    // Reset animation state so Play is ready from the start
+    if (animRafId !== null) { cancelAnimationFrame(animRafId); animRafId = null; }
+    animIsPlaying = false;
     animOffset = 0;
     animNextWordIndex = 0;
-    if (animShowAllFn) animShowAllFn();
+    // Show all words in static state (no fade — just reset)
+    document.querySelectorAll("#wordOutput .word").forEach(el => {
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0)";
+      el.style.transition = "none";
+    });
+    const playBtn = document.getElementById("playAnimationBtn");
+    if (playBtn) { playBtn.textContent = "▶ Play"; playBtn.classList.remove("playing"); }
     if (updatePlayButtonState) updatePlayButtonState();
   } catch (err) {
     console.error("runMachine error:", err);
