@@ -629,6 +629,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // hide all words instantly
     words.forEach(w => { w.style.transition = "none"; w.style.opacity = "0"; });
 
+    // Play audio if available
+    let audioSource = null;
+    if (audioBuffer && audioContext) {
+      audioSource = audioContext.createBufferSource();
+      audioSource.buffer = audioBuffer;
+      audioSource.connect(audioContext.destination);
+      audioSource.start(0);
+    }
+
     // reveal each word at its timestamp
     currentRows.forEach((row, i) => {
       const id = setTimeout(() => {
@@ -647,12 +656,22 @@ document.addEventListener("DOMContentLoaded", () => {
       if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
       if (resetBtn) resetBtn.disabled = false;
     }, totalMs));
+
+    // Store source so reset can stop it
+    window._audioSource = audioSource;
   }
 
   function resetAnimation() {
     activeTimeouts.forEach(id => clearTimeout(id));
     activeTimeouts = [];
     animRunning = false;
+
+    // Stop audio if playing
+    if (window._audioSource) {
+      try { window._audioSource.stop(); } catch(e) {}
+      window._audioSource = null;
+    }
+
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
     if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
