@@ -197,15 +197,5 @@
 
   </div>
   <script src="./main.js"></script>
-  <script>
-  let i = 0;
-  const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
-  link.rel = 'icon';
-  document.head.appendChild(link);
-  setInterval(() => {
-    link.href = 'data:image/gif;base64,' + GIF_DATA[i % GIF_DATA.length];
-    i++;
-  }, 100);
-</script>
 </body>
 </html>
