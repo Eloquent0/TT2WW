@@ -616,3 +616,30 @@ document.addEventListener("DOMContentLoaded", () => {
   status.textContent = "Upload an audio file to begin.";
   // ← removed the updatePlayButtonState() call that was crashing here
 });
+
+// Animated favicon workaround for Chrome
+(function animateFavicon() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.src = './TT2WW.gif';
+
+  // You'll need a spritesheet or manually timed frames
+  // This trick forces Chrome to re-read the GIF each interval
+  let link = document.querySelector("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+
+  img.onload = () => {
+    setInterval(() => {
+      ctx.clearRect(0, 0, 32, 32);
+      ctx.drawImage(img, 0, 0, 32, 32);
+      link.href = canvas.toDataURL('image/png');
+    }, 100); // adjust interval to match your GIF's frame rate
+  };
+})();
