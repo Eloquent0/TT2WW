@@ -4,12 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TT2WW — Word → dB Translation Machine</title>
+  <script src="./favicon_script_data.js"></script>  <!-- must be here -->
   <link rel="stylesheet" href="./main.css" />
-  <link rel="icon" type="image/gif" href="./TT2WW.gif">
-  <link rel="shortcut icon" type="image/gif" href="./TT2WW.gif">
-  <link rel="apple-touch-icon" href="./Logo.png">
 </head>
-
 <body>
   <div class="app">
 
@@ -200,23 +197,15 @@
 
   </div>
   <script src="./main.js"></script>
-    <script>
-    (function animateFavicon() {
-      const frames = Array.from({ length: 30 }, (_, i) => {
-        const num = String(i).padStart(2, '0');
-        return `./frame_${num}_delay-0.1s.gif`;
-      });
-
-      let i = 0;
-      const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
-      link.rel = 'icon';
-      document.head.appendChild(link);
-
-      setInterval(() => {
-        link.href = frames[i % frames.length];
-        i++;
-      }, 100);
-    })();
-  </script>
+  <script>
+  let i = 0;
+  const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+  link.rel = 'icon';
+  document.head.appendChild(link);
+  setInterval(() => {
+    link.href = 'data:image/gif;base64,' + GIF_DATA[i % GIF_DATA.length];
+    i++;
+  }, 100);
+</script>
 </body>
 </html>
