@@ -200,5 +200,23 @@
 
   </div>
   <script src="./main.js"></script>
+    <script>
+    (function animateFavicon() {
+      const frames = Array.from({ length: 30 }, (_, i) => {
+        const num = String(i).padStart(2, '0');
+        return `./frame_${num}_delay-0.1s.gif`;
+      });
+
+      let i = 0;
+      const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+
+      setInterval(() => {
+        link.href = frames[i % frames.length];
+        i++;
+      }, 100);
+    })();
+  </script>
 </body>
 </html>

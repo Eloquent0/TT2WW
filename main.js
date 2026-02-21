@@ -616,30 +616,48 @@ document.addEventListener("DOMContentLoaded", () => {
   status.textContent = "Upload an audio file to begin.";
   // ← removed the updatePlayButtonState() call that was crashing here
 });
-
-// Animated favicon workaround for Chrome
-(function animateFavicon() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d');
-  const img = new Image();
-  img.src = './TT2WW.gif';
-
-  // You'll need a spritesheet or manually timed frames
-  // This trick forces Chrome to re-read the GIF each interval
-  let link = document.querySelector("link[rel~='icon']");
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    document.head.appendChild(link);
-  }
-
-  img.onload = () => {
-    setInterval(() => {
-      ctx.clearRect(0, 0, 32, 32);
-      ctx.drawImage(img, 0, 0, 32, 32);
-      link.href = canvas.toDataURL('image/png');
-    }, 100); // adjust interval to match your GIF's frame rate
-  };
-})();
+(function animateFavicon(frames, interval) {
+  let i = 0;
+  const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+  link.rel = 'icon';
+  document.head.appendChild(link);
+  setInterval(() => {
+    link.href = frames[i % frames.length];
+    i++;
+  }, interval);
+})(
+  [
+    './frame_00_delay-0.1s.gif',
+    './frame_01_delay-0.1s.gif',
+    './frame_02_delay-0.1s.gif',
+    './frame_03_delay-0.1s.gif',
+    './frame_04_delay-0.1s.gif',
+    './frame_05_delay-0.1s.gif',
+    './frame_06_delay-0.1s.gif',
+    './frame_07_delay-0.1s.gif',
+    './frame_08_delay-0.1s.gif',
+    './frame_09_delay-0.1s.gif',
+    './frame_10_delay-0.1s.gif',
+    './frame_11_delay-0.1s.gif',
+    './frame_12_delay-0.1s.gif',
+    './frame_13_delay-0.1s.gif',
+    './frame_14_delay-0.1s.gif',
+    './frame_15_delay-0.1s.gif',
+    './frame_16_delay-0.1s.gif',
+    './frame_17_delay-0.1s.gif',
+    './frame_18_delay-0.1s.gif',
+    './frame_19_delay-0.1s.gif',
+    './frame_20_delay-0.1s.gif',
+    './frame_21_delay-0.1s.gif',
+    './frame_22_delay-0.1s.gif',
+    './frame_23_delay-0.1s.gif',
+    './frame_24_delay-0.1s.gif',
+    './frame_25_delay-0.1s.gif',
+    './frame_26_delay-0.1s.gif',
+    './frame_27_delay-0.1s.gif',
+    './frame_28_delay-0.1s.gif',
+    './frame_29_delay-0.1s.gif',
+    './frame_30_delay-0.1s.gif',
+  ],
+  100
+);
