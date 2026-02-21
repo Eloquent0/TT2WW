@@ -4,6 +4,7 @@ let dbTimeline = [];
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
+const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run";
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -282,21 +283,31 @@ async function runMachine() {
     }
 
     const text = document.getElementById("textInput").value;
-    if (!text.trim()) { status.textContent = "❌ Please enter text."; return; }
+    if (!text.trim() && !window._whisperWords) { status.textContent = "❌ Please enter text or transcribe first."; return; }
 
     status.textContent = "🎵 Measuring dB from audio...";
     dbTimeline = buildDbTimeline(durationSec, minDb, maxDb);
 
     status.textContent = "📝 Tokenizing + timestamping...";
-    const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
     let wordRows;
-    if (hasTimestamps) {
-      const segments = parseTimestampedText(text);
-      if (segments.length === 0) { status.textContent = "❌ No valid timestamps found."; return; }
-      wordRows = makeTimestampsFromSegments(segments, durationSec);
+    if (window._whisperWords && window._whisperWords.length) {
+      // Use precise Whisper timestamps directly
+      wordRows = window._whisperWords.map(w => ({
+        word: w.word,
+        start: w.start,
+        end: w.end,
+      }));
+      window._whisperWords = null; // clear after use
     } else {
-      const words = tokenize(text);
-      wordRows = makeTimestamps(words, durationSec);
+      const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
+      if (hasTimestamps) {
+        const segments = parseTimestampedText(text);
+        if (segments.length === 0) { status.textContent = "❌ No valid timestamps found."; return; }
+        wordRows = makeTimestampsFromSegments(segments, durationSec);
+      } else {
+        const words = tokenize(text);
+        wordRows = makeTimestamps(words, durationSec);
+      }
     }
 
     status.textContent = "📊 Mapping dB to words...";
@@ -501,8 +512,50 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const durEl = document.getElementById("durationSec");
         if (durEl) durEl.value = duration.toFixed(2);
-        status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate.`;
+        status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
         status.classList.remove("flashing");
+
+        // Add transcribe button if not already there
+        let transcribeBtn = document.getElementById("transcribeBtn");
+        if (!transcribeBtn) {
+          transcribeBtn = document.createElement("button");
+          transcribeBtn.id = "transcribeBtn";
+          transcribeBtn.textContent = "🎤 Transcribe";
+          transcribeBtn.className = "btn";
+          transcribeBtn.style.marginLeft = "8px";
+          document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
+
+          transcribeBtn.addEventListener("click", async () => {
+            if (!currentAudioFile) return;
+            status.textContent = "🎤 Transcribing… this may take 30–60 seconds.";
+            transcribeBtn.disabled = true;
+            transcribeBtn.textContent = "🎤 Transcribing…";
+            try {
+              const formData = new FormData();
+              formData.append("file", currentAudioFile);
+              const res = await fetch(MODAL_URL, { method: "POST", body: formData });
+              if (!res.ok) throw new Error(`Server error: ${res.status}`);
+              const json = await res.json();
+              const words = json.words;
+              if (!words || !words.length) throw new Error("No words returned.");
+
+              // Store precise timestamps for use in runMachine
+              window._whisperWords = words;
+
+              // Fill text box with the transcript
+              const transcript = words.map(w => w.word).join(" ");
+              document.getElementById("textInput").value = transcript;
+
+              status.textContent = `✅ Transcribed ${words.length} words. Click Generate.`;
+            } catch (err) {
+              status.textContent = `❌ Transcription failed: ${err.message}`;
+            } finally {
+              transcribeBtn.disabled = false;
+              transcribeBtn.textContent = "🎤 Transcribe";
+            }
+          });
+        }
+
       } catch (err) {
         status.textContent = `❌ ${err.message || "Could not decode audio."}`;
         audioBuffer = null; currentAudioFile = null; e.target.value = "";
