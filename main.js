@@ -506,8 +506,8 @@ document.addEventListener("DOMContentLoaded", () => {
         audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         currentAudioFile = file;
         const duration = audioBuffer.duration;
-        if (duration > 300 || duration <= 0) {
-          status.textContent = duration > 300 ? `❌ File too long (max 5 min)` : "❌ Invalid audio duration.";
+        if (duration > 600 || duration <= 0) {
+          status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
           audioBuffer = null; currentAudioFile = null; e.target.value = ""; return;
         }
         const durEl = document.getElementById("durationSec");
