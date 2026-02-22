@@ -4,7 +4,7 @@ let dbTimeline = [];
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
-const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run";
+const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run"; //important: usage limits//
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
