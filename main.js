@@ -618,6 +618,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
+    const wordOutput = document.getElementById("wordOutput");
 
     activeTimeouts.forEach(id => clearTimeout(id));
     activeTimeouts = [];
@@ -626,8 +627,43 @@ document.addEventListener("DOMContentLoaded", () => {
     if (playBtn)  { playBtn.textContent = "▶ Playing…"; playBtn.disabled = true; }
     if (resetBtn) resetBtn.disabled = true;
 
-    // hide all words instantly
-    words.forEach(w => { w.style.transition = "none"; w.style.opacity = "0"; });
+    // Add progress bar if not already there
+    let progressBar = document.getElementById("progressBar");
+    if (!progressBar) {
+      const container = wordOutput.parentElement;
+      container.style.position = "relative";
+      progressBar = document.createElement("div");
+      progressBar.id = "progressBar";
+      progressBar.innerHTML = '<div id="progressBarFill"></div>';
+      container.appendChild(progressBar);
+    }
+    const progressFill = document.getElementById("progressBarFill");
+
+    // Follow mode state
+    let followMode = true;
+    let scrollTimeout = null;
+
+    function onUserScroll() {
+      followMode = false;
+      // fade all words in when user scrolls
+      words.forEach(w => {
+        w.style.opacity = "1";
+        w.classList.remove("faded", "active");
+      });
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        followMode = true;
+      }, 2000);
+    }
+
+    wordOutput.addEventListener("scroll", onUserScroll);
+
+    // hide all words, set initial faded state
+    words.forEach(w => {
+      w.style.transition = "none";
+      w.style.opacity = "0";
+      w.classList.remove("faded", "active");
+    });
 
     // Play audio if available
     let audioSource = null;
@@ -637,13 +673,50 @@ document.addEventListener("DOMContentLoaded", () => {
       audioSource.connect(audioContext.destination);
       audioSource.start(0);
     }
+    window._audioSource = audioSource;
+
+    const totalDuration = currentRows[currentRows.length - 1].end * 1000;
+
+    // Progress bar updater
+    const progressInterval = setInterval(() => {
+      if (!animRunning) { clearInterval(progressInterval); return; }
+      // estimate current time based on elapsed
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min(100, (elapsed / totalDuration) * 100);
+      if (progressFill) progressFill.style.height = pct + "%";
+    }, 100);
+    activeTimeouts.push(progressInterval);
+
+    const startTime = Date.now();
 
     // reveal each word at its timestamp
     currentRows.forEach((row, i) => {
       const id = setTimeout(() => {
-        if (words[i]) {
-          words[i].style.transition = "opacity 0.15s ease";
-          words[i].style.opacity = "1";
+        if (!words[i]) return;
+
+        words[i].style.transition = "opacity 0.15s ease";
+        words[i].style.opacity = "1";
+
+        if (followMode) {
+          // Fade all previous words
+          words.forEach((w, j) => {
+            if (j < i) {
+              w.classList.add("faded");
+              w.classList.remove("active");
+              w.style.opacity = "0.25";
+            }
+          });
+          words[i].classList.add("active");
+          words[i].classList.remove("faded");
+
+          // Scroll current word into center of container
+          const containerHeight = wordOutput.clientHeight;
+          const wordTop = words[i].offsetTop;
+          const wordHeight = words[i].offsetHeight;
+          wordOutput.scrollTo({
+            top: wordTop - (containerHeight / 2) + (wordHeight / 2),
+            behavior: "smooth"
+          });
         }
       }, row.start * 1000);
       activeTimeouts.push(id);
@@ -653,32 +726,38 @@ document.addEventListener("DOMContentLoaded", () => {
     const totalMs = currentRows[currentRows.length - 1].start * 1000 + 500;
     activeTimeouts.push(setTimeout(() => {
       animRunning = false;
+      wordOutput.removeEventListener("scroll", onUserScroll);
+      if (progressFill) progressFill.style.height = "100%";
       if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
       if (resetBtn) resetBtn.disabled = false;
     }, totalMs));
-
-    // Store source so reset can stop it
-    window._audioSource = audioSource;
   }
 
   function resetAnimation() {
-    activeTimeouts.forEach(id => clearTimeout(id));
+    activeTimeouts.forEach(id => { clearTimeout(id); clearInterval(id); });
     activeTimeouts = [];
     animRunning = false;
 
-    // Stop audio if playing
     if (window._audioSource) {
       try { window._audioSource.stop(); } catch(e) {}
       window._audioSource = null;
     }
 
+    const progressFill = document.getElementById("progressBarFill");
+    if (progressFill) progressFill.style.height = "0%";
+
+    const wordOutput = document.getElementById("wordOutput");
+    if (wordOutput) wordOutput.scrollTo({ top: 0, behavior: "smooth" });
+
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
     if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
     if (resetBtn) resetBtn.disabled = false;
+
     document.querySelectorAll("#wordOutput .word").forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "1";
+      w.classList.remove("faded", "active");
     });
   }
 
