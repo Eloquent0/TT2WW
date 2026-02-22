@@ -526,19 +526,30 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
 
           transcribeBtn.addEventListener("click", async () => {
-            if (!currentAudioFile) return;
-            status.textContent = "🎤 Transcribing… this may take 30–60 seconds.";
-            transcribeBtn.disabled = true;
-            transcribeBtn.textContent = "🎤 Transcribing…";
-            try {
-              const formData = new FormData();
-              formData.append("file", currentAudioFile);
-              const res = await fetch(MODAL_URL, { method: "POST", body: formData });
-              if (!res.ok) throw new Error(`Server error: ${res.status}`);
-              const json = await res.json();
-              const words = json.words;
-              if (!words || !words.length) throw new Error("No words returned.");
+  if (!currentAudioFile) return;
+  status.textContent = "🎤 Transcribing… this may take 30–60 seconds.";
+  transcribeBtn.disabled = true;
+  transcribeBtn.textContent = "🎤 Transcribing…";
+  try {
+    const formData = new FormData();
+    formData.append("file", currentAudioFile);
 
+    let res;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        status.textContent = attempt > 1 ? `⏳ Attempt ${attempt}/3, server warming up…` : "🎤 Transcribing… this may take 30–60 seconds.";
+        res = await fetch(MODAL_URL, { method: "POST", body: formData });
+        if (res.ok) break;
+      } catch (err) {
+        if (attempt === 3) throw err;
+        await new Promise(r => setTimeout(r, 4000));
+      }
+    }
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const json = await res.json();
+    const words = json.words;
+    if (!words || !words.length) throw new Error("No words returned.");
               // Store precise timestamps for use in runMachine
               window._whisperWords = words;
 
