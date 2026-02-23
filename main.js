@@ -561,90 +561,98 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const fileInput = document.getElementById("wavFileInput");
-  if (fileInput) {
-    fileInput.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0]; if (!file) return;
-      status.textContent = "⏳ Loading audio...";
-      try {
-        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioContext.state === "suspended") await audioContext.resume();
-        const arrayBuffer = await file.arrayBuffer();
-        audioBuffer = await audioContext.decodeAudioData(arrayBuffer).catch(async () => {
-          // fallback: try re-fetching as blob with explicit type
-          const blob = new Blob([arrayBuffer], { type: 'audio/mp4' });
-          const ab2 = await blob.arrayBuffer();
-          return audioContext.decodeAudioData(ab2);
-        });
-        currentAudioFile = file;
-        const duration = audioBuffer.duration;
-        if (duration > 600 || duration <= 0) {
-          status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
-          audioBuffer = null; currentAudioFile = null; e.target.value = ""; return;
-        }
-        const durEl = document.getElementById("durationSec");
-        if (durEl) durEl.value = duration.toFixed(2);
-        status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
-        status.classList.remove("flashing");
+if (fileInput) {
+  fileInput.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    status.textContent = "⏳ Loading audio...";
+    try {
+      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioContext.state === "suspended") await audioContext.resume();
+      const arrayBuffer = await file.arrayBuffer();
 
-        let transcribeBtn = document.getElementById("transcribeBtn");
-        if (!transcribeBtn) {
-          transcribeBtn = document.createElement("button");
-          transcribeBtn.id = "transcribeBtn";
-          transcribeBtn.textContent = "🎤 Transcribe";
-          transcribeBtn.className = "btn";
-          transcribeBtn.style.marginLeft = "8px";
-          document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
+      audioBuffer = await new Promise((resolve, reject) => {
+        audioContext.decodeAudioData(
+          arrayBuffer,
+          (decoded) => resolve(decoded),
+          (err) => {
+            const blob = new Blob([arrayBuffer], { type: 'audio/mp4' });
+            blob.arrayBuffer().then(ab2 => {
+              audioContext.decodeAudioData(ab2, resolve, reject);
+            }).catch(reject);
+          }
+        );
+      });
 
-          transcribeBtn.addEventListener("click", async () => {
-            if (!currentAudioFile) return;
-            status.textContent = "🎤 Transcribing… this may take a few minutes for longer songs.";
-            transcribeBtn.disabled = true;
-            transcribeBtn.textContent = "🎤 Transcribing…";
-            try {
-              const formData = new FormData();
-              formData.append("file", currentAudioFile);
-
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
-
-              let res;
-              try {
-                res = await fetch(MODAL_URL, {
-                  method: "POST",
-                  body: formData,
-                  signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-              } catch (err) {
-                clearTimeout(timeoutId);
-                if (err.name === "AbortError") throw new Error("Timed out after 5 minutes.");
-                throw err;
-              }
-
-              if (!res.ok) throw new Error(`Server error: ${res.status}`);
-              const json = await res.json();
-              const words = json.words;
-              if (!words || !words.length) throw new Error("No words returned.");
-
-              window._whisperWords = words;
-              const transcript = words.map(w => w.word).join(" ");
-              document.getElementById("textInput").value = transcript;
-              status.textContent = `✅ Transcribed ${words.length} words. Click Generate.`;
-            } catch (err) {
-              status.textContent = `❌ Transcription failed: ${err.message}`;
-            } finally {
-              transcribeBtn.disabled = false;
-              transcribeBtn.textContent = "🎤 Transcribe";
-            }
-          });
-        }
-
-      } catch (err) {
-        status.textContent = `❌ ${err.message || "Could not decode audio."}`;
-        audioBuffer = null; currentAudioFile = null; e.target.value = "";
+      currentAudioFile = file;
+      const duration = audioBuffer.duration;
+      if (duration > 600 || duration <= 0) {
+        status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
+        audioBuffer = null; currentAudioFile = null; e.target.value = ""; return;
       }
-    });
-  }
+      const durEl = document.getElementById("durationSec");
+      if (durEl) durEl.value = duration.toFixed(2);
+      status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
+      status.classList.remove("flashing");
+
+      let transcribeBtn = document.getElementById("transcribeBtn");
+      if (!transcribeBtn) {
+        transcribeBtn = document.createElement("button");
+        transcribeBtn.id = "transcribeBtn";
+        transcribeBtn.textContent = "🎤 Transcribe";
+        transcribeBtn.className = "btn";
+        transcribeBtn.style.marginLeft = "8px";
+        document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
+
+        transcribeBtn.addEventListener("click", async () => {
+          if (!currentAudioFile) return;
+          status.textContent = "🎤 Transcribing… this may take a few minutes for longer songs.";
+          transcribeBtn.disabled = true;
+          transcribeBtn.textContent = "🎤 Transcribing…";
+          try {
+            const formData = new FormData();
+            formData.append("file", currentAudioFile);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000);
+
+            let res;
+            try {
+              res = await fetch(MODAL_URL, {
+                method: "POST",
+                body: formData,
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+            } catch (err) {
+              clearTimeout(timeoutId);
+              if (err.name === "AbortError") throw new Error("Timed out after 5 minutes.");
+              throw err;
+            }
+
+            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            const json = await res.json();
+            const words = json.words;
+            if (!words || !words.length) throw new Error("No words returned.");
+
+            window._whisperWords = words;
+            const transcript = words.map(w => w.word).join(" ");
+            document.getElementById("textInput").value = transcript;
+            status.textContent = `✅ Transcribed ${words.length} words. Click Generate.`;
+          } catch (err) {
+            status.textContent = `❌ Transcription failed: ${err.message}`;
+          } finally {
+            transcribeBtn.disabled = false;
+            transcribeBtn.textContent = "🎤 Transcribe";
+          }
+        });
+      }
+
+    } catch (err) {
+      status.textContent = `❌ ${err.message || "Could not decode audio."}`;
+      audioBuffer = null; currentAudioFile = null; e.target.value = "";
+    }
+  });
+}
 
   document.getElementById("generateBtn")?.addEventListener("click", runMachine);
 
