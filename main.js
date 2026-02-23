@@ -698,14 +698,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const resetBtn = document.getElementById("resetAnimationBtn");
     const wordOutput = document.getElementById("wordOutput");
 
-    activeTimeouts.forEach(id => clearTimeout(id));
+    activeTimeouts.forEach(id => { clearTimeout(id); cancelAnimationFrame(id); });
     activeTimeouts = [];
     animRunning = true;
 
     if (playBtn)  { playBtn.textContent = "▶ Playing…"; playBtn.disabled = true; }
     if (resetBtn) resetBtn.disabled = true;
 
-    // Add progress bar if not already there
+    // Progress bar
     let progressBar = document.getElementById("progressBar");
     if (!progressBar) {
       const container = wordOutput.parentElement;
@@ -717,27 +717,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const progressFill = document.getElementById("progressBarFill");
 
-    // Follow mode — tracks whether we're auto-scrolling
+    // Follow mode
     let followMode = true;
     let isAutoScrolling = false;
     let scrollTimeout = null;
 
     function onUserScroll() {
-      // Ignore our own programmatic scrolls
       if (isAutoScrolling) return;
       followMode = false;
-      // Show all words fully when user takes over
-      words.forEach(w => {
-        w.style.opacity = "1";
-        w.classList.remove("faded", "active");
-      });
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => { followMode = true; }, 2000);
     }
-
     wordOutput.addEventListener("scroll", onUserScroll);
 
-    // Hide all words initially (opacity 0 keeps layout intact unlike display:none)
+    // Set all words to initial state — hidden but taking up space
     words.forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "0";
@@ -755,75 +748,85 @@ document.addEventListener("DOMContentLoaded", () => {
     window._audioSource = audioSource;
 
     const totalDuration = currentRows[currentRows.length - 1].end * 1000;
-    const startTime = Date.now();
+    const startTime = performance.now();
+    let lastActiveIndex = -1;
+    let rafId = null;
 
-    // Progress bar updater
-    const progressInterval = setInterval(() => {
-      if (!animRunning) { clearInterval(progressInterval); return; }
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min(100, (elapsed / totalDuration) * 100);
-      if (progressFill) progressFill.style.height = pct + "%";
-    }, 100);
-    activeTimeouts.push(progressInterval);
+    function tick(now) {
+      if (!animRunning) return;
+      const elapsed = now - startTime;
 
-    // Reveal each word at its timestamp
-    currentRows.forEach((row, i) => {
-      const id = setTimeout(() => {
-        if (!words[i] || !animRunning) return;
+      // Update progress bar
+      if (progressFill) {
+        progressFill.style.height = Math.min(100, (elapsed / totalDuration) * 100) + "%";
+      }
 
-        if (followMode) {
-          // Set opacity states for all words
-          words.forEach((w, j) => {
-            w.style.transition = "opacity 0.15s ease";
-            if (j < i) {
-              w.style.opacity = "0.25";
-              w.classList.add("faded");
-              w.classList.remove("active");
-            } else if (j === i) {
-              w.style.opacity = "1";
-              w.classList.add("active");
-              w.classList.remove("faded");
-            } else {
-              w.style.opacity = "0";
-              w.classList.remove("faded", "active");
+      // Find which word should be active right now
+      let activeIndex = -1;
+      for (let i = currentRows.length - 1; i >= 0; i--) {
+        if (elapsed >= currentRows[i].start * 1000) { activeIndex = i; break; }
+      }
+
+      // Only update DOM when the active word changes
+      if (activeIndex !== lastActiveIndex) {
+        lastActiveIndex = activeIndex;
+
+        if (activeIndex >= 0) {
+          if (followMode) {
+            // Only touch the words that need to change
+            if (activeIndex > 0) {
+              // Previous word: fade it
+              const prev = words[activeIndex - 1];
+              prev.style.transition = "opacity 0.15s ease";
+              prev.style.opacity = "0.25";
+              prev.classList.add("faded");
+              prev.classList.remove("active");
             }
-          });
+            // Current word: show it full
+            const curr = words[activeIndex];
+            curr.style.transition = "opacity 0.15s ease";
+            curr.style.opacity = "1";
+            curr.classList.add("active");
+            curr.classList.remove("faded");
 
-          // Auto-scroll to current word
-          isAutoScrolling = true;
-          const containerHeight = wordOutput.clientHeight;
-          const wordTop = words[i].offsetTop;
-          const wordHeight = words[i].offsetHeight;
-          wordOutput.scrollTo({
-            top: wordTop - (containerHeight / 2) + (wordHeight / 2),
-            behavior: "smooth"
-          });
-          setTimeout(() => { isAutoScrolling = false; }, 600);
-
-        } else {
-          // In explore mode just reveal the word
-          words[i].style.transition = "opacity 0.15s ease";
-          words[i].style.opacity = "1";
+            // Auto-scroll
+            isAutoScrolling = true;
+            const containerHeight = wordOutput.clientHeight;
+            wordOutput.scrollTo({
+              top: curr.offsetTop - (containerHeight / 2) + (curr.offsetHeight / 2),
+              behavior: "smooth"
+            });
+            setTimeout(() => { isAutoScrolling = false; }, 600);
+          } else {
+            // Explore mode: just reveal each word as it comes
+            const curr = words[activeIndex];
+            curr.style.transition = "opacity 0.15s ease";
+            curr.style.opacity = "1";
+          }
         }
-      }, row.start * 1000);
-      activeTimeouts.push(id);
-    });
+      }
 
-    // Done
-    const totalMs = currentRows[currentRows.length - 1].end * 1000 + 500;
-    activeTimeouts.push(setTimeout(() => {
-      animRunning = false;
-      wordOutput.removeEventListener("scroll", onUserScroll);
-      if (progressFill) progressFill.style.height = "100%";
-      // Show all words at full opacity when done
-      words.forEach(w => {
-        w.style.transition = "opacity 0.3s ease";
-        w.style.opacity = "1";
-        w.classList.remove("faded", "active");
-      });
-      if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
-      if (resetBtn) resetBtn.disabled = false;
-    }, totalMs));
+      // Check if done
+      if (elapsed >= totalDuration + 500) {
+        animRunning = false;
+        wordOutput.removeEventListener("scroll", onUserScroll);
+        if (progressFill) progressFill.style.height = "100%";
+        words.forEach(w => {
+          w.style.transition = "opacity 0.3s ease";
+          w.style.opacity = "1";
+          w.classList.remove("faded", "active");
+        });
+        if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
+        if (resetBtn) resetBtn.disabled = false;
+        return;
+      }
+
+      rafId = requestAnimationFrame(tick);
+      activeTimeouts.push(rafId);
+    }
+
+    rafId = requestAnimationFrame(tick);
+    activeTimeouts.push(rafId);
   }
 
   function resetAnimation() {
