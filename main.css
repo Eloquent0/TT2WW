@@ -372,6 +372,8 @@ h1 {
   min-height: 200px;
   line-height: 1.15;
   overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .output:hover .legend { opacity: 1; pointer-events: auto; }

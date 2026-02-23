@@ -297,14 +297,15 @@ async function runMachine() {
     status.textContent = "📝 Tokenizing + timestamping...";
     let wordRows;
     let usedAutoTimestamps = false;
+
     if (window._whisperWords && window._whisperWords.length) {
-      // Use precise Whisper timestamps directly
+      // Whisper gives precise timestamps — use directly, no offset needed
       wordRows = window._whisperWords.map(w => ({
         word: w.word,
         start: w.start,
         end: w.end,
       }));
-      window._whisperWords = null; // clear after use
+      window._whisperWords = null;
     } else {
       const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
       if (hasTimestamps) {
@@ -318,17 +319,16 @@ async function runMachine() {
       }
     }
 
+    // Only apply silence offset for auto-distributed timestamps, not Whisper
     if (usedAutoTimestamps) {
-      const thresholdDb = Math.max(minDb + 3, -45);
+      const thresholdDb = Math.max(minDb + 5, -40);
       const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
-      if (offset > 0) {
-        wordRows = wordRows
-          .map(r => ({
-            ...r,
-            start: Math.min(r.start + offset, durationSec),
-            end: Math.min(r.end + offset, durationSec),
-          }))
-          .filter(r => r.start < durationSec && r.end > 0);
+      if (offset > 0.5) {
+        wordRows = wordRows.map(r => ({
+          ...r,
+          start: Math.min(r.start + offset, durationSec),
+          end: Math.min(r.end + offset, durationSec),
+        })).filter(r => r.start < durationSec && r.end > 0);
       }
     }
 
@@ -537,7 +537,6 @@ document.addEventListener("DOMContentLoaded", () => {
         status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
         status.classList.remove("flashing");
 
-        // Add transcribe button if not already there
         let transcribeBtn = document.getElementById("transcribeBtn");
         if (!transcribeBtn) {
           transcribeBtn = document.createElement("button");
@@ -548,37 +547,34 @@ document.addEventListener("DOMContentLoaded", () => {
           document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
 
           transcribeBtn.addEventListener("click", async () => {
-  if (!currentAudioFile) return;
-  status.textContent = "🎤 Transcribing… this may take 30–60 seconds.";
-  transcribeBtn.disabled = true;
-  transcribeBtn.textContent = "🎤 Transcribing…";
-  try {
-    const formData = new FormData();
-    formData.append("file", currentAudioFile);
+            if (!currentAudioFile) return;
+            status.textContent = "🎤 Transcribing… this may take 30–60 seconds.";
+            transcribeBtn.disabled = true;
+            transcribeBtn.textContent = "🎤 Transcribing…";
+            try {
+              const formData = new FormData();
+              formData.append("file", currentAudioFile);
 
-    let res;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        status.textContent = attempt > 1 ? `⏳ Attempt ${attempt}/3, server warming up…` : "🎤 Transcribing… this may take 30–60 seconds.";
-        res = await fetch(MODAL_URL, { method: "POST", body: formData });
-        if (res.ok) break;
-      } catch (err) {
-        if (attempt === 3) throw err;
-        await new Promise(r => setTimeout(r, 4000));
-      }
-    }
+              let res;
+              for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                  status.textContent = attempt > 1 ? `⏳ Attempt ${attempt}/3, server warming up…` : "🎤 Transcribing… this may take 30–60 seconds.";
+                  res = await fetch(MODAL_URL, { method: "POST", body: formData });
+                  if (res.ok) break;
+                } catch (err) {
+                  if (attempt === 3) throw err;
+                  await new Promise(r => setTimeout(r, 4000));
+                }
+              }
 
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
-    const json = await res.json();
-    const words = json.words;
-    if (!words || !words.length) throw new Error("No words returned.");
-              // Store precise timestamps for use in runMachine
+              if (!res.ok) throw new Error(`Server error: ${res.status}`);
+              const json = await res.json();
+              const words = json.words;
+              if (!words || !words.length) throw new Error("No words returned.");
+
               window._whisperWords = words;
-
-              // Fill text box with the transcript
               const transcript = words.map(w => w.word).join(" ");
               document.getElementById("textInput").value = transcript;
-
               status.textContent = `✅ Transcribed ${words.length} words. Click Generate.`;
             } catch (err) {
               status.textContent = `❌ Transcription failed: ${err.message}`;
@@ -613,7 +609,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("scrubDb").textContent = Number.isFinite(db) ? `${db.toFixed(1)} dB` : "— dB";
   });
 
-  // Auth — only wire up if supabase exists
   if (typeof supabase !== 'undefined' && supabase) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       window.currentUser = session?.user || null; updateAuthUI();
@@ -632,7 +627,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (error) return alert(error.message);
       alert("✅ Check your email for the magic link!");
     });
-    document.getElementById("logoutBtn")?.addEventListener("click",   async () => { await supabase.auth.signOut(); });
+    document.getElementById("logoutBtn")?.addEventListener("click", async () => { await supabase.auth.signOut(); });
     document.getElementById("saveDraftBtn")?.addEventListener("click", () => saveCreation({ isPublic: false }));
     document.getElementById("publishBtn")?.addEventListener("click",   () => saveCreation({ isPublic: true }));
     document.getElementById("galleryBtn")?.addEventListener("click",   showGallery);
@@ -678,27 +673,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function onUserScroll() {
       followMode = false;
-      // fade all words in when user scrolls
       words.forEach(w => {
+        w.style.visibility = "visible";
         w.style.opacity = "1";
         w.classList.remove("faded", "active");
       });
       clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        followMode = true;
-      }, 2000);
+      scrollTimeout = setTimeout(() => { followMode = true; }, 2000);
     }
 
     wordOutput.addEventListener("scroll", onUserScroll);
 
-    // hide all words, set initial faded state
+    // Hide words using visibility so layout is preserved for offsetTop
     words.forEach(w => {
       w.style.transition = "none";
+      w.style.visibility = "hidden";
       w.style.opacity = "0";
       w.classList.remove("faded", "active");
     });
 
-    // Play audio if available
+    // Play audio
     let audioSource = null;
     if (audioBuffer && audioContext) {
       audioSource = audioContext.createBufferSource();
@@ -709,24 +703,23 @@ document.addEventListener("DOMContentLoaded", () => {
     window._audioSource = audioSource;
 
     const totalDuration = currentRows[currentRows.length - 1].end * 1000;
+    const startTime = Date.now();
 
     // Progress bar updater
     const progressInterval = setInterval(() => {
       if (!animRunning) { clearInterval(progressInterval); return; }
-      // estimate current time based on elapsed
       const elapsed = Date.now() - startTime;
       const pct = Math.min(100, (elapsed / totalDuration) * 100);
       if (progressFill) progressFill.style.height = pct + "%";
     }, 100);
     activeTimeouts.push(progressInterval);
 
-    const startTime = Date.now();
-
-    // reveal each word at its timestamp
+    // Reveal each word at its timestamp
     currentRows.forEach((row, i) => {
       const id = setTimeout(() => {
         if (!words[i]) return;
 
+        words[i].style.visibility = "visible";
         words[i].style.transition = "opacity 0.15s ease";
         words[i].style.opacity = "1";
 
@@ -734,15 +727,16 @@ document.addEventListener("DOMContentLoaded", () => {
           // Fade all previous words
           words.forEach((w, j) => {
             if (j < i) {
+              w.style.visibility = "visible";
+              w.style.opacity = "0.25";
               w.classList.add("faded");
               w.classList.remove("active");
-              w.style.opacity = "0.25";
             }
           });
           words[i].classList.add("active");
           words[i].classList.remove("faded");
 
-          // Scroll current word into center of container
+          // Scroll current word to center — accurate because visibility:hidden preserves layout
           const containerHeight = wordOutput.clientHeight;
           const wordTop = words[i].offsetTop;
           const wordHeight = words[i].offsetHeight;
@@ -755,8 +749,8 @@ document.addEventListener("DOMContentLoaded", () => {
       activeTimeouts.push(id);
     });
 
-    // done
-    const totalMs = currentRows[currentRows.length - 1].start * 1000 + 500;
+    // Done
+    const totalMs = currentRows[currentRows.length - 1].end * 1000 + 500;
     activeTimeouts.push(setTimeout(() => {
       animRunning = false;
       wordOutput.removeEventListener("scroll", onUserScroll);
@@ -790,6 +784,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#wordOutput .word").forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "1";
+      w.style.visibility = "visible";
       w.classList.remove("faded", "active");
     });
   }
@@ -798,8 +793,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("resetAnimationBtn")?.addEventListener("click", resetAnimation);
 
   status.textContent = "Upload an audio file to begin.";
-  // ← removed the updatePlayButtonState() call that was crashing here
 });
+
 (function animateFavicon(frames, interval) {
   let i = 0;
   const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
