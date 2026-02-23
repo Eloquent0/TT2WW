@@ -269,6 +269,48 @@ function getLeadingSilenceOffset(timeline, thresholdDb) {
   return firstSound ? firstSound.t : 0;
 }
 
+function clearAll() {
+  // Stop any running animation
+  if (window._audioSource) {
+    try { window._audioSource.stop(); } catch(e) {}
+    window._audioSource = null;
+  }
+
+  // Reset state
+  currentRows = [];
+  dbTimeline = [];
+  audioBuffer = null;
+  audioContext = null;
+  currentAudioFile = null;
+  window._whisperWords = null;
+
+  // Reset UI
+  document.getElementById("wordOutput").innerHTML = "";
+  document.getElementById("textInput").value = "";
+  document.getElementById("wavFileInput").value = "";
+  document.getElementById("durationSec").value = "0";
+  document.querySelector("#metaTable tbody").innerHTML = "";
+
+  const progressFill = document.getElementById("progressBarFill");
+  if (progressFill) progressFill.style.height = "0%";
+
+  const scrub = document.getElementById("scrub");
+  if (scrub) { scrub.value = "0"; }
+  document.getElementById("scrubTime").textContent = "0.00s";
+  document.getElementById("scrubDb").textContent = "— dB";
+
+  const playBtn = document.getElementById("playAnimationBtn");
+  const resetBtn = document.getElementById("resetAnimationBtn");
+  if (playBtn) { playBtn.disabled = true; playBtn.textContent = "▶ Play"; }
+  if (resetBtn) resetBtn.disabled = true;
+
+  // Remove transcribe button so it regenerates on next upload
+  const transcribeBtn = document.getElementById("transcribeBtn");
+  if (transcribeBtn) transcribeBtn.remove();
+
+  document.getElementById("status").textContent = "Upload an audio file to begin.";
+}
+
 async function runMachine() {
   const status = document.getElementById("status");
   const minDb = Number(document.getElementById("minDb").value);
@@ -299,7 +341,6 @@ async function runMachine() {
     let usedAutoTimestamps = false;
 
     if (window._whisperWords && window._whisperWords.length) {
-      // Whisper gives precise timestamps — use directly, no offset needed
       wordRows = window._whisperWords.map(w => ({
         word: w.word,
         start: w.start,
@@ -319,7 +360,6 @@ async function runMachine() {
       }
     }
 
-    // Only apply silence offset for auto-distributed timestamps, not Whisper
     if (usedAutoTimestamps) {
       const thresholdDb = Math.max(minDb + 5, -40);
       const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
@@ -508,6 +548,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Wire up clear button
+  document.getElementById("clearAllBtn")?.addEventListener("click", () => {
+    if (confirm("Clear everything and start over?")) clearAll();
+  });
+
   if (!window.AudioContext && !window.webkitAudioContext) {
     status.textContent = "❌ Web Audio API not supported in this browser."; return;
   }
@@ -548,31 +593,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
           transcribeBtn.addEventListener("click", async () => {
             if (!currentAudioFile) return;
-            status.textContent = "🎤 Transcribing… this may take 30–60 seconds.";
+            status.textContent = "🎤 Transcribing… this may take a few minutes for longer songs.";
             transcribeBtn.disabled = true;
             transcribeBtn.textContent = "🎤 Transcribing…";
             try {
               const formData = new FormData();
               formData.append("file", currentAudioFile);
 
-              let res;
-              for (let attempt = 1; attempt <= 3; attempt++) {
-                try {
-                  status.textContent = attempt > 1 ? `⏳ Attempt ${attempt}/3, server warming up…` : "🎤 Transcribing… this may take 30–60 seconds.";
-                  const controller = new AbortController();
-                  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
 
-                  res = await fetch(MODAL_URL, {
-                    method: "POST",
-                    body: formData,
-                    signal: controller.signal
-                  });
-                  clearTimeout(timeoutId);
-                  if (res.ok) break;
-                } catch (err) {
-                  if (attempt === 3) throw err;
-                  await new Promise(r => setTimeout(r, 4000));
-                }
+              let res;
+              try {
+                res = await fetch(MODAL_URL, {
+                  method: "POST",
+                  body: formData,
+                  signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+              } catch (err) {
+                clearTimeout(timeoutId);
+                if (err.name === "AbortError") throw new Error("Timed out after 5 minutes.");
+                throw err;
               }
 
               if (!res.ok) throw new Error(`Server error: ${res.status}`);
@@ -675,16 +717,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const progressFill = document.getElementById("progressBarFill");
 
-    // Follow mode state
+    // Follow mode — tracks whether we're auto-scrolling
     let followMode = true;
+    let isAutoScrolling = false;
     let scrollTimeout = null;
-    let autoScrolling = false;
 
     function onUserScroll() {
-      // Ignore scroll events triggered by our own auto-scroll
-      if (autoScrolling) return;
-      
+      // Ignore our own programmatic scrolls
+      if (isAutoScrolling) return;
       followMode = false;
+      // Show all words fully when user takes over
       words.forEach(w => {
         w.style.opacity = "1";
         w.classList.remove("faded", "active");
@@ -695,7 +737,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     wordOutput.addEventListener("scroll", onUserScroll);
 
-    // Show all words but make them invisible (opacity=0) to preserve layout
+    // Hide all words initially (opacity 0 keeps layout intact unlike display:none)
     words.forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "0";
@@ -727,34 +769,28 @@ document.addEventListener("DOMContentLoaded", () => {
     // Reveal each word at its timestamp
     currentRows.forEach((row, i) => {
       const id = setTimeout(() => {
-        if (!words[i]) return;
-        if (!animRunning) return; // Stop if animation was reset
+        if (!words[i] || !animRunning) return;
 
         if (followMode) {
-          // Update ALL words every time to maintain proper state
-          for (let j = 0; j < words.length; j++) {
+          // Set opacity states for all words
+          words.forEach((w, j) => {
+            w.style.transition = "opacity 0.15s ease";
             if (j < i) {
-              // Past words: faded
-              words[j].style.transition = "opacity 0.15s ease";
-              words[j].style.opacity = "0.25";
-              words[j].classList.add("faded");
-              words[j].classList.remove("active");
+              w.style.opacity = "0.25";
+              w.classList.add("faded");
+              w.classList.remove("active");
             } else if (j === i) {
-              // Current word: active and visible
-              words[j].style.transition = "opacity 0.15s ease";
-              words[j].style.opacity = "1";
-              words[j].classList.add("active");
-              words[j].classList.remove("faded");
+              w.style.opacity = "1";
+              w.classList.add("active");
+              w.classList.remove("faded");
             } else {
-              // Future words: invisible
-              words[j].style.transition = "opacity 0.15s ease";
-              words[j].style.opacity = "0";
-              words[j].classList.remove("faded", "active");
+              w.style.opacity = "0";
+              w.classList.remove("faded", "active");
             }
-          }
+          });
 
-          // Scroll current word to center
-          autoScrolling = true;
+          // Auto-scroll to current word
+          isAutoScrolling = true;
           const containerHeight = wordOutput.clientHeight;
           const wordTop = words[i].offsetTop;
           const wordHeight = words[i].offsetHeight;
@@ -762,10 +798,10 @@ document.addEventListener("DOMContentLoaded", () => {
             top: wordTop - (containerHeight / 2) + (wordHeight / 2),
             behavior: "smooth"
           });
-          // Reset flag after scroll animation completes
-          setTimeout(() => { autoScrolling = false; }, 500);
+          setTimeout(() => { isAutoScrolling = false; }, 600);
+
         } else {
-          // If not in follow mode, just show the word
+          // In explore mode just reveal the word
           words[i].style.transition = "opacity 0.15s ease";
           words[i].style.opacity = "1";
         }
@@ -779,6 +815,12 @@ document.addEventListener("DOMContentLoaded", () => {
       animRunning = false;
       wordOutput.removeEventListener("scroll", onUserScroll);
       if (progressFill) progressFill.style.height = "100%";
+      // Show all words at full opacity when done
+      words.forEach(w => {
+        w.style.transition = "opacity 0.3s ease";
+        w.style.opacity = "1";
+        w.classList.remove("faded", "active");
+      });
       if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
       if (resetBtn) resetBtn.disabled = false;
     }, totalMs));

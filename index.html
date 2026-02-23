@@ -4,25 +4,33 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>TT2WW — Word → dB Translation Machine</title>
-  <script src="./favicon_script_data.js"></script>  <!-- must be here -->
+  <script src="./favicon_script_data.js"></script>
   <link rel="stylesheet" href="./main.css" />
 </head>
 <body>
   <div class="app">
 
     <details class="version" id="versionDetails">
-      <summary>ver.0.1.4</summary>
+      <summary>ver.0.1.5</summary>
       <div class="changelog">
         <div class="changelog-current">
-          <h4>Current Release (v0.1.4)</h4>
+          <h4>Current Release (v0.1.5)</h4>
           <ul>
-            <li>Backend improvements</li>
-            <li>Translation support</li>
+            <li>Follow mode with auto-scroll during animation</li>
+            <li>Progress bar on output</li>
+            <li>Clear / start over button</li>
+            <li>Output box height matched to input</li>
+            <li>Scroll bug fixed during animation</li>
           </ul>
         </div>
         <div class="changelog-history">
           <h4>Past Releases</h4>
           <div class="changelog-entry">
+            <h5>v0.1.4</h5>
+            <ul>
+              <li>Backend improvements</li>
+              <li>Translation support</li>
+            </ul>
             <h5>v0.1.3</h5>
             <ul>
               <li>Big update: added a transcription API</li>
@@ -37,18 +45,9 @@
             <h5>v0.0.2</h5>
             <ul>
               <li>Added timestamp support (M:SS format)</li>
-              <li>5 volume calculation methods (RMS, Weighted, Peak Smoothed, Median, Mean)</li>
-              <li>Improved audio decoding with better error handling</li>
-              <li>Fixed duration field auto-update on file upload</li>
-              <li>Progressive word reveal animation with play/pause/reset</li>
-            </ul>
-            <h5>v0.0.1</h5>
-            <ul>
-              <li>Added timestamp support (M:SS format)</li>
-              <li>5 volume calculation methods (RMS, Weighted, Peak Smoothed, Median, Mean)</li>
-              <li>Improved audio decoding with better error handling</li>
-              <li>Fixed duration field auto-update on file upload</li>
-              <li>Progressive word reveal animation with play/pause/reset</li>
+              <li>5 volume calculation methods</li>
+              <li>Improved audio decoding</li>
+              <li>Progressive word reveal animation</li>
             </ul>
           </div>
         </div>
@@ -86,8 +85,8 @@
           <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*" class="input">
         </div>
 
-        <label class="label">Text (type or paste your transcript)</label>
-        <textarea id="textInput" class="textarea" rows="6" placeholder="Type or paste text here...">This is a thirty second test where loudness changes the size of words and silence creates space.</textarea>
+        <label class="label">Text (paste transcript or use auto-transcribe below)</label>
+        <textarea id="textInput" class="textarea" rows="6" placeholder="Paste transcript here, or upload a file and click Transcribe to generate one automatically."></textarea>
 
         <div class="field">
           <label class="label">Mapping Mode (affects dB→size curve only)</label>
@@ -127,6 +126,7 @@
         <div class="row row3 actions">
           <button id="generateBtn" class="btn primary">Generate</button>
           <button id="downloadCsvBtn" class="btn">Download CSV</button>
+          <button id="clearAllBtn" class="btn clear-btn">🗑 Clear All</button>
         </div>
 
         <div class="row row2 actions">
@@ -144,12 +144,11 @@
           <p>Generated typography output based on audio amplitude analysis.</p>
         </details>
 
-        <!-- Output action bar: copy on left, playback controls on right -->
         <div class="output-controls">
           <button id="copyOutputBtn" class="btn">📋 Copy</button>
           <div class="playback-controls">
-            <button id="playAnimationBtn" class="btn play-btn">▶ Play</button>
-            <button id="resetAnimationBtn" class="btn reset-btn">↺ Reset</button>
+            <button id="playAnimationBtn" class="btn play-btn" disabled>▶ Play</button>
+            <button id="resetAnimationBtn" class="btn reset-btn" disabled>↺ Reset</button>
           </div>
         </div>
 
