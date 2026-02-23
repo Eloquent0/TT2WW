@@ -678,8 +678,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Follow mode state
     let followMode = true;
     let scrollTimeout = null;
+    let autoScrolling = false;
 
     function onUserScroll() {
+      // Ignore scroll events triggered by our own auto-scroll
+      if (autoScrolling) return;
+      
       followMode = false;
       words.forEach(w => {
         w.style.opacity = "1";
@@ -750,6 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           // Scroll current word to center
+          autoScrolling = true;
           const containerHeight = wordOutput.clientHeight;
           const wordTop = words[i].offsetTop;
           const wordHeight = words[i].offsetHeight;
@@ -757,6 +762,8 @@ document.addEventListener("DOMContentLoaded", () => {
             top: wordTop - (containerHeight / 2) + (wordHeight / 2),
             behavior: "smooth"
           });
+          // Reset flag after scroll animation completes
+          setTimeout(() => { autoScrolling = false; }, 500);
         } else {
           // If not in follow mode, just show the word
           words[i].style.transition = "opacity 0.15s ease";
