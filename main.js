@@ -361,17 +361,16 @@ async function runMachine() {
     }
 
     if (usedAutoTimestamps) {
-      const thresholdDb = Math.max(minDb + 5, -40);
-      const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
-      if (offset > 0.5) {
-        wordRows = wordRows.map(r => ({
-          ...r,
-          start: Math.min(r.start + offset, durationSec),
-          end: Math.min(r.end + offset, durationSec),
-        })).filter(r => r.start < durationSec && r.end > 0);
-      }
-    }
-
+  const thresholdDb = -38; // fixed threshold, independent of minDb/maxDb
+  const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
+  if (offset > 0.5) {
+    wordRows = wordRows.map(r => ({
+      ...r,
+      start: Math.min(r.start + offset, durationSec),
+      end: Math.min(r.end + offset, durationSec),
+    }))
+  }
+}
     status.textContent = "📊 Mapping dB to words...";
     const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb, volumeMethod);
     currentRows = rows;
