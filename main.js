@@ -725,20 +725,26 @@ document.addEventListener("DOMContentLoaded", () => {
       const id = setTimeout(() => {
         if (!words[i]) return;
 
-        words[i].style.transition = "opacity 0.15s ease";
-        words[i].style.opacity = "1";
-
         if (followMode) {
-          // Fade all previous words
+          // Set all previous words to faded
           words.forEach((w, j) => {
             if (j < i) {
+              w.style.transition = "opacity 0.15s ease";
               w.style.opacity = "0.25";
               w.classList.add("faded");
               w.classList.remove("active");
+            } else if (j === i) {
+              // Current word is fully visible and active
+              w.style.transition = "opacity 0.15s ease";
+              w.style.opacity = "1";
+              w.classList.add("active");
+              w.classList.remove("faded");
+            } else {
+              // Future words stay invisible
+              w.style.opacity = "0";
+              w.classList.remove("faded", "active");
             }
           });
-          words[i].classList.add("active");
-          words[i].classList.remove("faded");
 
           // Scroll current word to center
           const containerHeight = wordOutput.clientHeight;
@@ -748,6 +754,10 @@ document.addEventListener("DOMContentLoaded", () => {
             top: wordTop - (containerHeight / 2) + (wordHeight / 2),
             behavior: "smooth"
           });
+        } else {
+          // If not in follow mode, just show the word
+          words[i].style.transition = "opacity 0.15s ease";
+          words[i].style.opacity = "1";
         }
       }, row.start * 1000);
       activeTimeouts.push(id);
