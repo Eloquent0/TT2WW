@@ -724,27 +724,30 @@ document.addEventListener("DOMContentLoaded", () => {
     currentRows.forEach((row, i) => {
       const id = setTimeout(() => {
         if (!words[i]) return;
+        if (!animRunning) return; // Stop if animation was reset
 
         if (followMode) {
-          // Set all previous words to faded
-          words.forEach((w, j) => {
+          // Update ALL words every time to maintain proper state
+          for (let j = 0; j < words.length; j++) {
             if (j < i) {
-              w.style.transition = "opacity 0.15s ease";
-              w.style.opacity = "0.25";
-              w.classList.add("faded");
-              w.classList.remove("active");
+              // Past words: faded
+              words[j].style.transition = "opacity 0.15s ease";
+              words[j].style.opacity = "0.25";
+              words[j].classList.add("faded");
+              words[j].classList.remove("active");
             } else if (j === i) {
-              // Current word is fully visible and active
-              w.style.transition = "opacity 0.15s ease";
-              w.style.opacity = "1";
-              w.classList.add("active");
-              w.classList.remove("faded");
+              // Current word: active and visible
+              words[j].style.transition = "opacity 0.15s ease";
+              words[j].style.opacity = "1";
+              words[j].classList.add("active");
+              words[j].classList.remove("faded");
             } else {
-              // Future words stay invisible
-              w.style.opacity = "0";
-              w.classList.remove("faded", "active");
+              // Future words: invisible
+              words[j].style.transition = "opacity 0.15s ease";
+              words[j].style.opacity = "0";
+              words[j].classList.remove("faded", "active");
             }
-          });
+          }
 
           // Scroll current word to center
           const containerHeight = wordOutput.clientHeight;
