@@ -559,7 +559,15 @@ document.addEventListener("DOMContentLoaded", () => {
               for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
                   status.textContent = attempt > 1 ? `⏳ Attempt ${attempt}/3, server warming up…` : "🎤 Transcribing… this may take 30–60 seconds.";
-                  res = await fetch(MODAL_URL, { method: "POST", body: formData });
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min
+
+                  res = await fetch(MODAL_URL, {
+                    method: "POST",
+                    body: formData,
+                    signal: controller.signal
+                  });
+                  clearTimeout(timeoutId);
                   if (res.ok) break;
                 } catch (err) {
                   if (attempt === 3) throw err;
