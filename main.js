@@ -569,7 +569,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
         if (audioContext.state === "suspended") await audioContext.resume();
         const arrayBuffer = await file.arrayBuffer();
-        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        audioBuffer = await audioContext.decodeAudioData(arrayBuffer).catch(async () => {
+          // fallback: try re-fetching as blob with explicit type
+          const blob = new Blob([arrayBuffer], { type: 'audio/mp4' });
+          const ab2 = await blob.arrayBuffer();
+          return audioContext.decodeAudioData(ab2);
+        });
         currentAudioFile = file;
         const duration = audioBuffer.duration;
         if (duration > 600 || duration <= 0) {
