@@ -568,19 +568,30 @@ if (fileInput) {
     try {
       if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
       if (audioContext.state === "suspended") await audioContext.resume();
+
+      const { createFFmpeg, fetchFile } = FFmpeg;
+      const ffmpeg = createFFmpeg({ log: false });
+
       const arrayBuffer = await file.arrayBuffer();
+      let finalBuffer = arrayBuffer;
+
+      // Try direct decode first
+      const canDecode = await new Promise(resolve => {
+        const testCtx = new (window.AudioContext || window.webkitAudioContext)();
+        testCtx.decodeAudioData(arrayBuffer.slice(0), () => resolve(true), () => resolve(false));
+      });
+
+      if (!canDecode) {
+        status.textContent = "⏳ Converting audio format...";
+        if (!ffmpeg.isLoaded()) await ffmpeg.load();
+        ffmpeg.FS('writeFile', 'input.m4a', await fetchFile(file));
+        await ffmpeg.run('-i', 'input.m4a', '-f', 'wav', 'output.wav');
+        const data = ffmpeg.FS('readFile', 'output.wav');
+        finalBuffer = data.buffer;
+      }
 
       audioBuffer = await new Promise((resolve, reject) => {
-        audioContext.decodeAudioData(
-          arrayBuffer,
-          (decoded) => resolve(decoded),
-          (err) => {
-            const blob = new Blob([arrayBuffer], { type: 'audio/mp4' });
-            blob.arrayBuffer().then(ab2 => {
-              audioContext.decodeAudioData(ab2, resolve, reject);
-            }).catch(reject);
-          }
-        );
+        audioContext.decodeAudioData(finalBuffer, resolve, reject);
       });
 
       currentAudioFile = file;
@@ -885,3 +896,7 @@ if (fileInput) {
     i++;
   }, interval);
 })(GIF_DATA, 100);
+(err) => {
+  console.error("decodeAudioData failed:", err);
+  reject(new Error("Could not decode audio. If this is an iPhone recording, try converting to WAV or MP3 first using cloudconvert.com"));
+}
