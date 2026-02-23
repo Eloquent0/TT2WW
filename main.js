@@ -263,6 +263,12 @@ function getDbAtTime(t) {
   return dbTimeline[clamp(Math.round(t / 0.05), 0, dbTimeline.length - 1)].db;
 }
 
+function getLeadingSilenceOffset(timeline, thresholdDb) {
+  if (!timeline || !timeline.length) return 0;
+  const firstSound = timeline.find(s => Number.isFinite(s.db) && s.db >= thresholdDb);
+  return firstSound ? firstSound.t : 0;
+}
+
 async function runMachine() {
   const status = document.getElementById("status");
   const minDb = Number(document.getElementById("minDb").value);
@@ -290,6 +296,7 @@ async function runMachine() {
 
     status.textContent = "📝 Tokenizing + timestamping...";
     let wordRows;
+    let usedAutoTimestamps = false;
     if (window._whisperWords && window._whisperWords.length) {
       // Use precise Whisper timestamps directly
       wordRows = window._whisperWords.map(w => ({
@@ -307,6 +314,21 @@ async function runMachine() {
       } else {
         const words = tokenize(text);
         wordRows = makeTimestamps(words, durationSec);
+        usedAutoTimestamps = true;
+      }
+    }
+
+    if (usedAutoTimestamps) {
+      const thresholdDb = Math.max(minDb + 3, -45);
+      const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
+      if (offset > 0) {
+        wordRows = wordRows
+          .map(r => ({
+            ...r,
+            start: Math.min(r.start + offset, durationSec),
+            end: Math.min(r.end + offset, durationSec),
+          }))
+          .filter(r => r.start < durationSec && r.end > 0);
       }
     }
 
