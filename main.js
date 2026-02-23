@@ -682,7 +682,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function onUserScroll() {
       followMode = false;
       words.forEach(w => {
-        w.style.visibility = "visible";
         w.style.opacity = "1";
         w.classList.remove("faded", "active");
       });
@@ -692,10 +691,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     wordOutput.addEventListener("scroll", onUserScroll);
 
-    // Hide words using visibility so layout is preserved for offsetTop
+    // Show all words but make them invisible (opacity=0) to preserve layout
     words.forEach(w => {
       w.style.transition = "none";
-      w.style.visibility = "hidden";
       w.style.opacity = "0";
       w.classList.remove("faded", "active");
     });
@@ -727,7 +725,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const id = setTimeout(() => {
         if (!words[i]) return;
 
-        words[i].style.visibility = "visible";
         words[i].style.transition = "opacity 0.15s ease";
         words[i].style.opacity = "1";
 
@@ -735,7 +732,6 @@ document.addEventListener("DOMContentLoaded", () => {
           // Fade all previous words
           words.forEach((w, j) => {
             if (j < i) {
-              w.style.visibility = "visible";
               w.style.opacity = "0.25";
               w.classList.add("faded");
               w.classList.remove("active");
@@ -744,7 +740,7 @@ document.addEventListener("DOMContentLoaded", () => {
           words[i].classList.add("active");
           words[i].classList.remove("faded");
 
-          // Scroll current word to center — accurate because visibility:hidden preserves layout
+          // Scroll current word to center
           const containerHeight = wordOutput.clientHeight;
           const wordTop = words[i].offsetTop;
           const wordHeight = words[i].offsetHeight;
@@ -792,7 +788,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#wordOutput .word").forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "1";
-      w.style.visibility = "visible";
       w.classList.remove("faded", "active");
     });
   }
