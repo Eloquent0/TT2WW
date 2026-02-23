@@ -719,11 +719,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Follow mode
     let followMode = true;
-    let isAutoScrolling = false;
+    let autoScrollBlockedUntil = 0;
     let scrollTimeout = null;
 
     function onUserScroll() {
-      if (isAutoScrolling) return;
+      // Block scroll events that fall within our auto-scroll window
+      if (performance.now() < autoScrollBlockedUntil) return;
       followMode = false;
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => { followMode = true; }, 2000);
@@ -789,14 +790,13 @@ document.addEventListener("DOMContentLoaded", () => {
             curr.classList.add("active");
             curr.classList.remove("faded");
 
-            // Auto-scroll
-            isAutoScrolling = true;
+            // Auto-scroll — block scroll detection for 800ms to cover smooth scroll duration
+            autoScrollBlockedUntil = performance.now() + 800;
             const containerHeight = wordOutput.clientHeight;
             wordOutput.scrollTo({
               top: curr.offsetTop - (containerHeight / 2) + (curr.offsetHeight / 2),
               behavior: "smooth"
             });
-            setTimeout(() => { isAutoScrolling = false; }, 600);
           } else {
             // Explore mode: just reveal each word as it comes
             const curr = words[activeIndex];
