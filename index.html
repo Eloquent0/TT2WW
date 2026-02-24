@@ -11,41 +11,38 @@
   <div class="app">
 
     <details class="version" id="versionDetails">
-      <summary>ver.1.1.6</summary>
+      <summary>ver.1.2.0</summary>
       <div class="changelog">
         <div class="changelog-current">
-          <h4>Current Release (v1.1.6)</h4>
+          <h4>Current Release (v1.2.0)</h4>
           <ul>
-            <li>Editable transcript remap — fix Whisper errors without re-transcribing</li>
-            <li>Timing preserved when you add or remove words</li>
-            <li>Live transcript indicator on textarea</li>
+            <li>Waveform view under timeline scrubber</li>
+            <li>Playhead tracks position during scrub</li>
           </ul>
         </div>
         <div class="changelog-history">
           <h4>Past Releases</h4>
           <div class="changelog-entry">
+            <h5>v1.1.6</h5>
+            <ul>
+              <li>Editable transcript remap</li>
+              <li>Timing preserved when editing words</li>
+              <li>Live transcript indicator</li>
+            </ul>
+            <h5>v0.1.6</h5>
+            <ul>
+              <li>Drag and drop file upload</li>
+            </ul>
             <h5>v0.1.5</h5>
             <ul>
-              <li>Follow mode with auto-scroll during animation</li>
+              <li>Follow mode with auto-scroll</li>
               <li>Progress bar on output</li>
               <li>Clear / start over button</li>
-              <li>Output box height matched to input</li>
-              <li>Scroll bug fixed during animation</li>
-            </ul>
-            <h5>v0.1.4</h5>
-            <ul>
-              <li>Backend improvements</li>
-              <li>Translation support</li>
             </ul>
             <h5>v0.1.3</h5>
             <ul>
               <li>Transcription API added</li>
               <li>Animated favicon support</li>
-            </ul>
-            <h5>v0.0.3</h5>
-            <ul>
-              <li>Animation option for output</li>
-              <li>Rate limiting</li>
             </ul>
           </div>
         </div>
@@ -173,7 +170,11 @@
         </div>
 
         <div class="timeline">
-          <input id="scrub" type="range" min="0" max="600" value="0" step="0.05">
+          <div class="waveform-wrap">
+            <canvas id="waveformCanvas" class="waveform-canvas"></canvas>
+            <canvas id="waveformPlayhead" class="waveform-playhead"></canvas>
+            <input id="scrub" type="range" min="0" max="600" value="0" step="0.05" class="scrub-range">
+          </div>
           <div class="timelineMeta">
             <span id="scrubTime">0.00s</span>
             <span id="scrubDb">— dB</span>
