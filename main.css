@@ -2,11 +2,8 @@
 
 body {
   margin: 0; padding: 20px;
-  background: 
-    radial-gradient(ellipse at top, rgba(30,60,150,0.3) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom, rgba(30,60,150,0.3) 0%, transparent 50%),
-    linear-gradient(to bottom, #000000 0%, #000000 75%, #0b1a2a 100%);
-  color: #fff;
+  background: #f5f5f0;
+  color: #333;
   font-family: 'Michroma', sans-serif;
 }
 
