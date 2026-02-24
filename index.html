@@ -11,21 +11,27 @@
   <div class="app">
 
     <details class="version" id="versionDetails">
-      <summary>ver.0.1.5</summary>
+      <summary>ver.1.1.6</summary>
       <div class="changelog">
         <div class="changelog-current">
-          <h4>Current Release (v0.1.5)</h4>
+          <h4>Current Release (v1.1.6)</h4>
           <ul>
-            <li>Follow mode with auto-scroll during animation</li>
-            <li>Progress bar on output</li>
-            <li>Clear / start over button</li>
-            <li>Output box height matched to input</li>
-            <li>Scroll bug fixed during animation</li>
+            <li>Editable transcript remap — fix Whisper errors without re-transcribing</li>
+            <li>Timing preserved when you add or remove words</li>
+            <li>Live transcript indicator on textarea</li>
           </ul>
         </div>
         <div class="changelog-history">
           <h4>Past Releases</h4>
           <div class="changelog-entry">
+            <h5>v0.1.5</h5>
+            <ul>
+              <li>Follow mode with auto-scroll during animation</li>
+              <li>Progress bar on output</li>
+              <li>Clear / start over button</li>
+              <li>Output box height matched to input</li>
+              <li>Scroll bug fixed during animation</li>
+            </ul>
             <h5>v0.1.4</h5>
             <ul>
               <li>Backend improvements</li>
@@ -33,21 +39,13 @@
             </ul>
             <h5>v0.1.3</h5>
             <ul>
-              <li>Big update: added a transcription API</li>
+              <li>Transcription API added</li>
               <li>Animated favicon support</li>
             </ul>
             <h5>v0.0.3</h5>
             <ul>
-              <li>Added ratelimiting</li>
               <li>Animation option for output</li>
-              <li>Backend changes</li>
-            </ul>
-            <h5>v0.0.2</h5>
-            <ul>
-              <li>Added timestamp support (M:SS format)</li>
-              <li>5 volume calculation methods</li>
-              <li>Improved audio decoding</li>
-              <li>Progressive word reveal animation</li>
+              <li>Rate limiting</li>
             </ul>
           </div>
         </div>
@@ -60,7 +58,6 @@
         <p class="sub">Designed By Tyler Sakata</p>
         <p class="sub">Upload audio/video to analyze amplitude and drive typographic size per word.</p>
       </div>
-
       <div class="auth">
         <span id="authInfo" class="auth-info"></span>
         <input id="emailInput" class="input auth-email" placeholder="email@example.com" type="email">
@@ -68,7 +65,6 @@
         <button id="galleryBtn" class="btn" style="display:none;">🎨 Gallery</button>
         <button id="logoutBtn" class="btn ghost" style="display:none;">Logout</button>
       </div>
-
       <div class="badge">10:00</div>
     </header>
 
@@ -82,10 +78,23 @@
 
         <div class="field">
           <label class="label">Upload Audio/Video File (10 minutes or less)</label>
-          <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*,.m4a,.mp4,.wav,.mp3" class="input">
+          <div id="dropZone" class="drop-zone">
+            <div class="drop-zone-inner">
+              <div class="drop-icon">🎵</div>
+              <div class="drop-text">Drop audio or video here</div>
+              <div class="drop-sub">or <span class="drop-browse">browse files</span></div>
+              <div class="drop-formats">MP3 · WAV · M4A · MP4 · WEBM</div>
+            </div>
+            <input id="wavFileInput" type="file" accept="audio/*,video/mp4,video/webm,video/*,.m4a,.mp4,.wav,.mp3" class="drop-input">
+          </div>
+          <div id="fileInfo" class="file-info" style="display:none;"></div>
         </div>
 
         <label class="label">Text (paste transcript or use auto-transcribe below)</label>
+        <div id="transcriptModeIndicator">
+          <span class="indicator-dot"></span>
+          Live transcript — edit freely, timing preserved on Generate
+        </div>
         <textarea id="textInput" class="textarea" rows="6" placeholder="Paste transcript here, or upload a file and click Transcribe to generate one automatically."></textarea>
 
         <div class="field">
@@ -134,7 +143,7 @@
           <button id="publishBtn" class="btn" disabled>🌍 Publish Public</button>
         </div>
 
-        <p id="status" class="status flashing">Upload a WAV file to begin.</p>
+        <p id="status" class="status flashing">Upload a file to begin.</p>
       </div>
 
       <div class="card">
@@ -179,18 +188,12 @@
         <summary>Data Details</summary>
         <p>Raw word-level data from the audio analysis.</p>
       </details>
-
       <div class="tableWrap">
         <table id="metaTable" class="table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>word</th>
-              <th>start</th>
-              <th>end</th>
-              <th>dbMean</th>
-              <th>dbMax</th>
-              <th>size(px)</th>
+              <th>#</th><th>word</th><th>start</th><th>end</th>
+              <th>dbMean</th><th>dbMax</th><th>size(px)</th>
             </tr>
           </thead>
           <tbody></tbody>

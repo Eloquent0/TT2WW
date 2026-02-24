@@ -4,7 +4,8 @@ let dbTimeline = [];
 let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
-const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run"; //important: usage limits//
+let whisperTimestampBank = null; // persists across edits
+const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run";
 
 // ---------- Utils ----------
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -107,6 +108,34 @@ function makeTimestamps(words, durationSec) {
   return rows;
 }
 
+// ---------- Remap logic ----------
+// Takes edited words and maps them to the whisper timestamp bank by position.
+// If the user added/removed words, we stretch/compress the bank proportionally.
+function remapWordsToTimestamps(editedWords, bank, durationSec) {
+  if (!bank || !bank.length) return null;
+
+  const n = editedWords.length;
+  const m = bank.length;
+
+  return editedWords.map((word, i) => {
+    // Map position in edited list → position in original bank
+    const bankPos = (i / Math.max(n - 1, 1)) * (m - 1);
+    const lo = Math.floor(bankPos);
+    const hi = Math.min(Math.ceil(bankPos), m - 1);
+    const frac = bankPos - lo;
+
+    // Interpolate start and end from neighboring bank entries
+    const start = bank[lo].start + frac * (bank[hi].start - bank[lo].start);
+    const end   = bank[lo].end   + frac * (bank[hi].end   - bank[lo].end);
+
+    return {
+      word,
+      start: Math.min(start, durationSec),
+      end:   Math.min(Math.max(end, start + 0.05), durationSec),
+    };
+  });
+}
+
 function assignDbToWords(wordRows, dbTimeline, minDb, maxDb, method = 'rms') {
   const SILENCE_FLOOR = -60;
   return wordRows.map(row => {
@@ -173,6 +202,18 @@ function escapeHtml(str) {
             .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 }
 
+function setTranscriptMode(active) {
+  const textarea = document.getElementById("textInput");
+  const indicator = document.getElementById("transcriptModeIndicator");
+  if (active) {
+    textarea.classList.add("transcript-live");
+    if (indicator) indicator.style.display = "flex";
+  } else {
+    textarea.classList.remove("transcript-live");
+    if (indicator) indicator.style.display = "none";
+  }
+}
+
 function renderWords(rows, minDb, maxDb, mode = "neutral") {
   const container = document.getElementById("wordOutput");
   container.innerHTML = "";
@@ -214,12 +255,9 @@ function renderTable(rows, minDb, maxDb, mode = "neutral") {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${i + 1}</td>
-      <td>${escapeHtml(r.word)}</td>
-      <td>${r.start.toFixed(2)}</td>
-      <td>${r.end.toFixed(2)}</td>
-      <td>${(r.dbMean ?? r.db).toFixed(1)}</td>
-      <td>${(r.dbMax ?? r.db).toFixed(1)}</td>
+      <td>${i + 1}</td><td>${escapeHtml(r.word)}</td>
+      <td>${r.start.toFixed(2)}</td><td>${r.end.toFixed(2)}</td>
+      <td>${(r.dbMean ?? r.db).toFixed(1)}</td><td>${(r.dbMax ?? r.db).toFixed(1)}</td>
       <td>${size}</td>
     `;
     tbody.appendChild(tr);
@@ -230,14 +268,9 @@ function rowsToCsv(rows, minDb, maxDb, mode = "neutral") {
   const lines = ["index,word,start,end,dbMean,dbMax,font_px"];
   rows.forEach((r, i) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
-    lines.push([
-      i + 1,
-      `"${String(r.word).replaceAll('"','""')}"`,
+    lines.push([i+1, `"${String(r.word).replaceAll('"','""')}"`,
       r.start.toFixed(2), r.end.toFixed(2),
-      (r.dbMean ?? r.db).toFixed(1),
-      (r.dbMax ?? r.db).toFixed(1),
-      size
-    ].join(","));
+      (r.dbMean ?? r.db).toFixed(1), (r.dbMax ?? r.db).toFixed(1), size].join(","));
   });
   return lines.join("\n");
 }
@@ -269,33 +302,56 @@ function getLeadingSilenceOffset(timeline, thresholdDb) {
   return firstSound ? firstSound.t : 0;
 }
 
+function showFileInfo(file, duration) {
+  const fileInfo = document.getElementById("fileInfo");
+  const dropZone = document.getElementById("dropZone");
+  const mb = (file.size / 1024 / 1024).toFixed(1);
+  const ext = file.name.split('.').pop().toUpperCase();
+  fileInfo.style.display = "flex";
+  fileInfo.innerHTML = `
+    <span class="file-info-icon">🎵</span>
+    <span class="file-info-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+    <span class="file-info-meta">${ext} · ${mb}MB · ${duration.toFixed(1)}s</span>
+    <button class="file-info-clear" title="Remove file" onclick="clearAll()">✕</button>
+  `;
+  dropZone.classList.add("has-file");
+  const dropText = dropZone.querySelector(".drop-text");
+  const dropSub = dropZone.querySelector(".drop-sub");
+  if (dropText) dropText.textContent = "Change file";
+  if (dropSub) dropSub.innerHTML = 'or <span class="drop-browse">browse</span>';
+}
+
 function clearAll() {
-  // Stop any running animation
   if (window._audioSource) {
     try { window._audioSource.stop(); } catch(e) {}
     window._audioSource = null;
   }
+  currentRows = []; dbTimeline = []; audioBuffer = null;
+  audioContext = null; currentAudioFile = null;
+  window._whisperWords = null; whisperTimestampBank = null;
 
-  // Reset state
-  currentRows = [];
-  dbTimeline = [];
-  audioBuffer = null;
-  audioContext = null;
-  currentAudioFile = null;
-  window._whisperWords = null;
-
-  // Reset UI
   document.getElementById("wordOutput").innerHTML = "";
   document.getElementById("textInput").value = "";
   document.getElementById("wavFileInput").value = "";
   document.getElementById("durationSec").value = "0";
   document.querySelector("#metaTable tbody").innerHTML = "";
+  setTranscriptMode(false);
+
+  const dropZone = document.getElementById("dropZone");
+  const fileInfo = document.getElementById("fileInfo");
+  if (dropZone) {
+    dropZone.classList.remove("has-file");
+    const dropText = dropZone.querySelector(".drop-text");
+    const dropSub = dropZone.querySelector(".drop-sub");
+    if (dropText) dropText.textContent = "Drop audio or video here";
+    if (dropSub) dropSub.innerHTML = 'or <span class="drop-browse">browse files</span>';
+  }
+  if (fileInfo) { fileInfo.style.display = "none"; fileInfo.innerHTML = ""; }
 
   const progressFill = document.getElementById("progressBarFill");
   if (progressFill) progressFill.style.height = "0%";
-
   const scrub = document.getElementById("scrub");
-  if (scrub) { scrub.value = "0"; }
+  if (scrub) scrub.value = "0";
   document.getElementById("scrubTime").textContent = "0.00s";
   document.getElementById("scrubDb").textContent = "— dB";
 
@@ -304,11 +360,113 @@ function clearAll() {
   if (playBtn) { playBtn.disabled = true; playBtn.textContent = "▶ Play"; }
   if (resetBtn) resetBtn.disabled = true;
 
-  // Remove transcribe button so it regenerates on next upload
   const transcribeBtn = document.getElementById("transcribeBtn");
   if (transcribeBtn) transcribeBtn.remove();
 
-  document.getElementById("status").textContent = "Upload an audio file to begin.";
+  document.getElementById("status").textContent = "Upload a file to begin.";
+}
+
+async function loadAudioFile(file) {
+  const status = document.getElementById("status");
+  status.textContent = "⏳ Loading audio...";
+  try {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioContext.state === "suspended") await audioContext.resume();
+
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    const ffmpeg = createFFmpeg({ log: false });
+    const arrayBuffer = await file.arrayBuffer();
+    let finalBuffer = arrayBuffer;
+
+    const canDecode = await new Promise(resolve => {
+      const testCtx = new (window.AudioContext || window.webkitAudioContext)();
+      testCtx.decodeAudioData(arrayBuffer.slice(0), () => resolve(true), () => resolve(false));
+    });
+
+    if (!canDecode) {
+      status.textContent = "⏳ Converting audio format...";
+      if (!ffmpeg.isLoaded()) await ffmpeg.load();
+      ffmpeg.FS('writeFile', 'input.m4a', await fetchFile(file));
+      await ffmpeg.run('-i', 'input.m4a', '-f', 'wav', 'output.wav');
+      const data = ffmpeg.FS('readFile', 'output.wav');
+      finalBuffer = data.buffer;
+    }
+
+    audioBuffer = await new Promise((resolve, reject) => {
+      audioContext.decodeAudioData(finalBuffer, resolve, reject);
+    });
+
+    currentAudioFile = file;
+    const duration = audioBuffer.duration;
+
+    if (duration > 600 || duration <= 0) {
+      status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
+      audioBuffer = null; currentAudioFile = null; return;
+    }
+
+    const durEl = document.getElementById("durationSec");
+    if (durEl) durEl.value = duration.toFixed(2);
+
+    showFileInfo(file, duration);
+    status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
+    status.classList.remove("flashing");
+
+    let transcribeBtn = document.getElementById("transcribeBtn");
+    if (!transcribeBtn) {
+      transcribeBtn = document.createElement("button");
+      transcribeBtn.id = "transcribeBtn";
+      transcribeBtn.textContent = "🎤 Transcribe";
+      transcribeBtn.className = "btn";
+      transcribeBtn.style.marginLeft = "8px";
+      document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
+
+      transcribeBtn.addEventListener("click", async () => {
+        if (!currentAudioFile) return;
+        status.textContent = "🎤 Transcribing… this may take a few minutes for longer songs.";
+        transcribeBtn.disabled = true;
+        transcribeBtn.textContent = "🎤 Transcribing…";
+        try {
+          const formData = new FormData();
+          formData.append("file", currentAudioFile);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 300000);
+          let res;
+          try {
+            res = await fetch(MODAL_URL, { method: "POST", body: formData, signal: controller.signal });
+            clearTimeout(timeoutId);
+          } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === "AbortError") throw new Error("Timed out after 5 minutes.");
+            throw err;
+          }
+          if (!res.ok) throw new Error(`Server error: ${res.status}`);
+          const json = await res.json();
+          const words = json.words;
+          if (!words || !words.length) throw new Error("No words returned.");
+
+          // Save to both the one-time use buffer AND the persistent bank
+          window._whisperWords = words;
+          whisperTimestampBank = words; // persists across edits
+
+          const transcript = words.map(w => w.word).join(" ");
+          document.getElementById("textInput").value = transcript;
+
+          // Activate live transcript mode
+          setTranscriptMode(true);
+
+          status.textContent = `✅ Transcribed ${words.length} words. Edit transcript then click Generate.`;
+        } catch (err) {
+          status.textContent = `❌ Transcription failed: ${err.message}`;
+        } finally {
+          transcribeBtn.disabled = false;
+          transcribeBtn.textContent = "🎤 Transcribe";
+        }
+      });
+    }
+  } catch (err) {
+    status.textContent = `❌ ${err.message || "Could not decode audio."}`;
+    audioBuffer = null; currentAudioFile = null;
+  }
 }
 
 async function runMachine() {
@@ -317,18 +475,14 @@ async function runMachine() {
   const maxDb = Number(document.getElementById("maxDb").value);
   const mode = document.getElementById("mapMode")?.value || "neutral";
   const volumeMethod = document.getElementById("volumeMethod")?.value || "rms";
-
   const generateBtn = document.getElementById("generateBtn");
   if (generateBtn) { generateBtn.disabled = true; generateBtn.textContent = "Generating…"; }
 
   try {
     if (!audioBuffer) { status.textContent = "❌ Please upload an audio file first."; return; }
     if (!(maxDb > minDb)) { status.textContent = "❌ Max dB must be greater than Min dB."; return; }
-
     const durationSec = audioBuffer.duration;
-    if (!Number.isFinite(durationSec) || durationSec <= 0) {
-      status.textContent = "❌ Invalid audio duration."; return;
-    }
+    if (!Number.isFinite(durationSec) || durationSec <= 0) { status.textContent = "❌ Invalid audio duration."; return; }
 
     const text = document.getElementById("textInput").value;
     if (!text.trim() && !window._whisperWords) { status.textContent = "❌ Please enter text or transcribe first."; return; }
@@ -338,39 +492,47 @@ async function runMachine() {
 
     status.textContent = "📝 Tokenizing + timestamping...";
     let wordRows;
-    let usedAutoTimestamps = false;
+
+    const editedWords = tokenize(text);
 
     if (window._whisperWords && window._whisperWords.length) {
-      wordRows = window._whisperWords.map(w => ({
-        word: w.word,
-        start: w.start,
-        end: w.end,
-      }));
+      // First generate after fresh transcription — use directly
+      wordRows = window._whisperWords.map(w => ({ word: w.word, start: w.start, end: w.end }));
       window._whisperWords = null;
+
+      // If user edited the word count, remap
+      if (wordRows.length !== editedWords.length) {
+        status.textContent = "🔀 Remapping edited transcript to timestamps...";
+        wordRows = remapWordsToTimestamps(editedWords, whisperTimestampBank, durationSec);
+      } else {
+        // Same count — replace words but keep timing
+        wordRows = wordRows.map((row, i) => ({ ...row, word: editedWords[i] }));
+      }
+    } else if (whisperTimestampBank && whisperTimestampBank.length) {
+      // Re-generate after editing — remap to saved bank
+      status.textContent = "🔀 Remapping edited transcript to timestamps...";
+      wordRows = remapWordsToTimestamps(editedWords, whisperTimestampBank, durationSec);
     } else {
+      // No whisper data at all — fall back to auto timestamps
       const hasTimestamps = /^\d{1,2}:\d{2}$/m.test(text);
       if (hasTimestamps) {
         const segments = parseTimestampedText(text);
         if (segments.length === 0) { status.textContent = "❌ No valid timestamps found."; return; }
         wordRows = makeTimestampsFromSegments(segments, durationSec);
       } else {
-        const words = tokenize(text);
-        wordRows = makeTimestamps(words, durationSec);
-        usedAutoTimestamps = true;
+        wordRows = makeTimestamps(editedWords, durationSec);
+        const thresholdDb = -38;
+        const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
+        if (offset > 0.5) {
+          wordRows = wordRows.map(r => ({
+            ...r,
+            start: Math.min(r.start + offset, durationSec),
+            end: Math.min(r.end + offset, durationSec),
+          }));
+        }
       }
     }
 
-    if (usedAutoTimestamps) {
-  const thresholdDb = -38; // fixed threshold, independent of minDb/maxDb
-  const offset = getLeadingSilenceOffset(dbTimeline, thresholdDb);
-  if (offset > 0.5) {
-    wordRows = wordRows.map(r => ({
-      ...r,
-      start: Math.min(r.start + offset, durationSec),
-      end: Math.min(r.end + offset, durationSec),
-    }))
-  }
-}
     status.textContent = "📊 Mapping dB to words...";
     const rows = assignDbToWords(wordRows, dbTimeline, minDb, maxDb, volumeMethod);
     currentRows = rows;
@@ -383,7 +545,8 @@ async function runMachine() {
     const durEl = document.getElementById("durationSec");
     if (durEl) durEl.value = durationSec.toFixed(2);
 
-    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s`;
+    const remapNote = whisperTimestampBank ? " • timing preserved ✓" : "";
+    status.textContent = `✅ Generated ${rows.length} words • Duration: ${durationSec.toFixed(2)}s${remapNote}`;
 
     const playBtn = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
@@ -429,8 +592,7 @@ async function saveCreation({ isPublic }) {
     const mode  = document.getElementById("mapMode")?.value || "neutral";
     const payload = { version: "1.0", data: { words: currentRows, mapping: { minDb, maxDb, minPx: 14, maxPx: 120, mode } } };
     const { data: created, error: insertErr } = await supabase
-      .from("creations")
-      .insert({ user_id: currentUser.id, title: "TT2WW", is_public: isPublic, data_json: payload })
+      .from("creations").insert({ user_id: currentUser.id, title: "TT2WW", is_public: isPublic, data_json: payload })
       .select("id").single();
     if (insertErr) throw insertErr;
     const shareUrl = `${window.location.origin}${window.location.pathname}?c=${created.id}`;
@@ -530,24 +692,23 @@ document.addEventListener("DOMContentLoaded", () => {
     copyOutputBtn.addEventListener("click", async () => {
       const wordOutput = document.getElementById("wordOutput"); if (!wordOutput) return;
       const clone = wordOutput.cloneNode(true);
-      clone.querySelectorAll('.word-tooltip').forEach(tooltip => tooltip.remove());
+      clone.querySelectorAll('.word-tooltip').forEach(t => t.remove());
       const words = clone.querySelectorAll('.word');
       words.forEach((word, index) => { if (index < words.length - 1) word.after(document.createTextNode(' ')); });
       const htmlContent = clone.innerHTML;
-      const plainText = Array.from(wordOutput.querySelectorAll('.word')).map(span => span.getAttribute('data-word') || '').filter(t => t).join(' ');
+      const plainText = Array.from(wordOutput.querySelectorAll('.word')).map(s => s.getAttribute('data-word') || '').filter(t => t).join(' ');
       try {
         await navigator.clipboard.write([new ClipboardItem({
           'text/html': new Blob([htmlContent], { type: 'text/html' }),
           'text/plain': new Blob([plainText], { type: 'text/plain' })
         })]);
-        const originalText = copyOutputBtn.textContent;
+        const orig = copyOutputBtn.textContent;
         copyOutputBtn.textContent = '✅ Copied!';
-        setTimeout(() => { copyOutputBtn.textContent = originalText; }, 2000);
+        setTimeout(() => { copyOutputBtn.textContent = orig; }, 2000);
       } catch (err) { console.error('Copy failed:', err); alert('Failed to copy'); }
     });
   }
 
-  // Wire up clear button
   document.getElementById("clearAllBtn")?.addEventListener("click", () => {
     if (confirm("Clear everything and start over?")) clearAll();
   });
@@ -560,110 +721,46 @@ document.addEventListener("DOMContentLoaded", () => {
     status.classList.remove("flashing"); return;
   }
 
+  // ── Drag and drop ──────────────────────────────────────────────────────────
+  const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("wavFileInput");
-if (fileInput) {
-  fileInput.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    status.textContent = "⏳ Loading audio...";
-    try {
-      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioContext.state === "suspended") await audioContext.resume();
 
-      const { createFFmpeg, fetchFile } = FFmpeg;
-      const ffmpeg = createFFmpeg({ log: false });
-
-      const arrayBuffer = await file.arrayBuffer();
-      let finalBuffer = arrayBuffer;
-
-      // Try direct decode first
-      const canDecode = await new Promise(resolve => {
-        const testCtx = new (window.AudioContext || window.webkitAudioContext)();
-        testCtx.decodeAudioData(arrayBuffer.slice(0), () => resolve(true), () => resolve(false));
-      });
-
-      if (!canDecode) {
-        status.textContent = "⏳ Converting audio format...";
-        if (!ffmpeg.isLoaded()) await ffmpeg.load();
-        ffmpeg.FS('writeFile', 'input.m4a', await fetchFile(file));
-        await ffmpeg.run('-i', 'input.m4a', '-f', 'wav', 'output.wav');
-        const data = ffmpeg.FS('readFile', 'output.wav');
-        finalBuffer = data.buffer;
-      }
-
-      audioBuffer = await new Promise((resolve, reject) => {
-        audioContext.decodeAudioData(finalBuffer, resolve, reject);
-      });
-
-      currentAudioFile = file;
-      const duration = audioBuffer.duration;
-      if (duration > 600 || duration <= 0) {
-        status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
-        audioBuffer = null; currentAudioFile = null; e.target.value = ""; return;
-      }
-      const durEl = document.getElementById("durationSec");
-      if (durEl) durEl.value = duration.toFixed(2);
-      status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
-      status.classList.remove("flashing");
-
-      let transcribeBtn = document.getElementById("transcribeBtn");
-      if (!transcribeBtn) {
-        transcribeBtn = document.createElement("button");
-        transcribeBtn.id = "transcribeBtn";
-        transcribeBtn.textContent = "🎤 Transcribe";
-        transcribeBtn.className = "btn";
-        transcribeBtn.style.marginLeft = "8px";
-        document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
-
-        transcribeBtn.addEventListener("click", async () => {
-          if (!currentAudioFile) return;
-          status.textContent = "🎤 Transcribing… this may take a few minutes for longer songs.";
-          transcribeBtn.disabled = true;
-          transcribeBtn.textContent = "🎤 Transcribing…";
-          try {
-            const formData = new FormData();
-            formData.append("file", currentAudioFile);
-
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000);
-
-            let res;
-            try {
-              res = await fetch(MODAL_URL, {
-                method: "POST",
-                body: formData,
-                signal: controller.signal
-              });
-              clearTimeout(timeoutId);
-            } catch (err) {
-              clearTimeout(timeoutId);
-              if (err.name === "AbortError") throw new Error("Timed out after 5 minutes.");
-              throw err;
-            }
-
-            if (!res.ok) throw new Error(`Server error: ${res.status}`);
-            const json = await res.json();
-            const words = json.words;
-            if (!words || !words.length) throw new Error("No words returned.");
-
-            window._whisperWords = words;
-            const transcript = words.map(w => w.word).join(" ");
-            document.getElementById("textInput").value = transcript;
-            status.textContent = `✅ Transcribed ${words.length} words. Click Generate.`;
-          } catch (err) {
-            status.textContent = `❌ Transcription failed: ${err.message}`;
-          } finally {
-            transcribeBtn.disabled = false;
-            transcribeBtn.textContent = "🎤 Transcribe";
-          }
-        });
-      }
-
-    } catch (err) {
-      status.textContent = `❌ ${err.message || "Could not decode audio."}`;
-      audioBuffer = null; currentAudioFile = null; e.target.value = "";
+  dropZone?.addEventListener("click", () => fileInput.click());
+  fileInput?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (file) await loadAudioFile(file);
+  });
+  dropZone?.addEventListener("dragenter", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone?.addEventListener("dragover",  (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone?.addEventListener("dragleave", (e) => {
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove("drag-over");
+  });
+  dropZone?.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const file = e.dataTransfer.files?.[0];
+    if (file) await loadAudioFile(file);
+  });
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type.startsWith("audio/") || file.type.startsWith("video/"))) {
+      await loadAudioFile(file);
     }
   });
-}
+
+  // Watch for edits to transcript when bank is active
+  document.getElementById("textInput")?.addEventListener("input", () => {
+    if (whisperTimestampBank) {
+      const editedWords = tokenize(document.getElementById("textInput").value);
+      const orig = whisperTimestampBank.length;
+      const diff = editedWords.length - orig;
+      const diffStr = diff === 0 ? "same count" : diff > 0 ? `+${diff} words` : `${diff} words`;
+      document.getElementById("status").textContent =
+        `✏️ Transcript edited (${editedWords.length} words, ${diffStr} vs original). Click Generate to remap.`;
+    }
+  });
 
   document.getElementById("generateBtn")?.addEventListener("click", runMachine);
 
@@ -692,7 +789,6 @@ if (fileInput) {
       if (event === "SIGNED_OUT") status.textContent = "Logged out.";
     });
     maybeLoadShared();
-
     document.getElementById("loginBtn")?.addEventListener("click", async () => {
       const email = document.getElementById("emailInput")?.value.trim();
       if (!email) return alert("Enter your email.");
@@ -713,22 +809,17 @@ if (fileInput) {
   function playAnimation() {
     if (animRunning) return;
     if (!currentRows.length) return;
-
     const words = Array.from(document.querySelectorAll("#wordOutput .word"));
     if (!words.length) return;
-
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
     const wordOutput = document.getElementById("wordOutput");
-
     activeTimeouts.forEach(id => { clearTimeout(id); cancelAnimationFrame(id); });
     activeTimeouts = [];
     animRunning = true;
-
     if (playBtn)  { playBtn.textContent = "▶ Playing…"; playBtn.disabled = true; }
     if (resetBtn) resetBtn.disabled = true;
 
-    // Progress bar
     let progressBar = document.getElementById("progressBar");
     if (!progressBar) {
       const container = wordOutput.parentElement;
@@ -740,13 +831,11 @@ if (fileInput) {
     }
     const progressFill = document.getElementById("progressBarFill");
 
-    // Follow mode
     let followMode = true;
     let autoScrollBlockedUntil = 0;
     let scrollTimeout = null;
 
     function onUserScroll() {
-      // Block scroll events that fall within our auto-scroll window
       if (performance.now() < autoScrollBlockedUntil) return;
       followMode = false;
       clearTimeout(scrollTimeout);
@@ -754,14 +843,12 @@ if (fileInput) {
     }
     wordOutput.addEventListener("scroll", onUserScroll);
 
-    // Set all words to initial state — hidden but taking up space
     words.forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "0";
       w.classList.remove("faded", "active");
     });
 
-    // Play audio
     let audioSource = null;
     if (audioBuffer && audioContext) {
       audioSource = audioContext.createBufferSource();
@@ -774,46 +861,37 @@ if (fileInput) {
     const totalDuration = currentRows[currentRows.length - 1].end * 1000;
     const startTime = performance.now();
     let lastActiveIndex = -1;
-    let rafId = null;
 
     function tick(now) {
       if (!animRunning) return;
       const elapsed = now - startTime;
 
-      // Update progress bar
       if (progressFill) {
         progressFill.style.height = Math.min(100, (elapsed / totalDuration) * 100) + "%";
       }
 
-      // Find which word should be active right now
       let activeIndex = -1;
       for (let i = currentRows.length - 1; i >= 0; i--) {
         if (elapsed >= currentRows[i].start * 1000) { activeIndex = i; break; }
       }
 
-      // Only update DOM when the active word changes
       if (activeIndex !== lastActiveIndex) {
         lastActiveIndex = activeIndex;
-
         if (activeIndex >= 0) {
           if (followMode) {
-            // Only touch the words that need to change
             if (activeIndex > 0) {
-              // Previous word: fade it
               const prev = words[activeIndex - 1];
               prev.style.transition = "opacity 0.15s ease";
               prev.style.opacity = "0.25";
               prev.classList.add("faded");
               prev.classList.remove("active");
             }
-            // Current word: show it full
             const curr = words[activeIndex];
             curr.style.transition = "opacity 0.15s ease";
             curr.style.opacity = "1";
             curr.classList.add("active");
             curr.classList.remove("faded");
 
-            // Auto-scroll — block scroll detection for 800ms to cover smooth scroll duration
             autoScrollBlockedUntil = performance.now() + 800;
             const containerHeight = wordOutput.clientHeight;
             wordOutput.scrollTo({
@@ -821,7 +899,6 @@ if (fileInput) {
               behavior: "smooth"
             });
           } else {
-            // Explore mode: just reveal each word as it comes
             const curr = words[activeIndex];
             curr.style.transition = "opacity 0.15s ease";
             curr.style.opacity = "1";
@@ -829,7 +906,15 @@ if (fileInput) {
         }
       }
 
-      // Check if done
+      // Brute force opacity enforcement
+      if (followMode && activeIndex >= 0) {
+        words.forEach((w, j) => {
+          const op = parseFloat(w.style.opacity);
+          if (j < activeIndex && op > 0.26) { w.style.opacity = "0.25"; }
+          else if (j > activeIndex && op > 0) { w.style.opacity = "0"; }
+        });
+      }
+
       if (elapsed >= totalDuration + 500) {
         animRunning = false;
         wordOutput.removeEventListener("scroll", onUserScroll);
@@ -844,35 +929,30 @@ if (fileInput) {
         return;
       }
 
-      rafId = requestAnimationFrame(tick);
+      const rafId = requestAnimationFrame(tick);
       activeTimeouts.push(rafId);
     }
 
-    rafId = requestAnimationFrame(tick);
+    const rafId = requestAnimationFrame(tick);
     activeTimeouts.push(rafId);
   }
 
   function resetAnimation() {
-    activeTimeouts.forEach(id => { clearTimeout(id); clearInterval(id); });
+    activeTimeouts.forEach(id => { clearTimeout(id); clearInterval(id); cancelAnimationFrame(id); });
     activeTimeouts = [];
     animRunning = false;
-
     if (window._audioSource) {
       try { window._audioSource.stop(); } catch(e) {}
       window._audioSource = null;
     }
-
     const progressFill = document.getElementById("progressBarFill");
     if (progressFill) progressFill.style.height = "0%";
-
     const wordOutput = document.getElementById("wordOutput");
     if (wordOutput) wordOutput.scrollTo({ top: 0, behavior: "smooth" });
-
     const playBtn  = document.getElementById("playAnimationBtn");
     const resetBtn = document.getElementById("resetAnimationBtn");
     if (playBtn)  { playBtn.textContent = "▶ Play"; playBtn.disabled = false; }
     if (resetBtn) resetBtn.disabled = false;
-
     document.querySelectorAll("#wordOutput .word").forEach(w => {
       w.style.transition = "none";
       w.style.opacity = "1";
@@ -883,7 +963,7 @@ if (fileInput) {
   document.getElementById("playAnimationBtn")?.addEventListener("click", playAnimation);
   document.getElementById("resetAnimationBtn")?.addEventListener("click", resetAnimation);
 
-  status.textContent = "Upload an audio file to begin.";
+  status.textContent = "Upload a file to begin.";
 });
 
 (function animateFavicon(frames, interval) {
@@ -896,7 +976,3 @@ if (fileInput) {
     i++;
   }, interval);
 })(GIF_DATA, 100);
-(err) => {
-  console.error("decodeAudioData failed:", err);
-  reject(new Error("Could not decode audio. If this is an iPhone recording, try converting to WAV or MP3 first using cloudconvert.com"));
-}
