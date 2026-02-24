@@ -10,8 +10,8 @@ body {
 .title {
   margin: 0; font-size: 64px; font-weight: 700;
   font-family: 'Michroma', sans-serif; font-style: italic;
-  letter-spacing: -.1em; text-transform: uppercase;
-  color: #4CAF50; text-align: center; position: relative;
+  letter-spacing: -.25em; text-transform: uppercase;
+  color: #9ACD32; text-align: center; position: relative;
 }
 .title::before { display: none; }
 .sub { font-family: "Eurostile", Arial, sans-serif; font-weight: 400; color: #333; text-align: center; margin: 6px 0 0; font-size: 14px; }
@@ -47,7 +47,7 @@ body {
 
 :root {
   --bg: #0b0f17; --card: #0f1623; --muted: #9aa7b0; --text: #e7eefc;
-  --line: #233046; --accent: #7aa7ff; --accent2: #4CAF50;
+  --line: #233046; --accent: #7aa7ff; --accent2: #9ACD32;
   --shadow: 0 12px 40px rgba(0,0,0,0.35); --radius: 16px;
 }
 
@@ -76,14 +76,14 @@ details[data-state="closing"] > *:not(summary) { animation: collapseUp 300ms eas
 .changelog ul { margin: 4px 0; padding-left: 16px; list-style: disc; }
 .changelog li { font-size: 8px; color: #6b6866; margin: 2px 0; line-height: 1.4; }
 
-.topbar { width: 100%; background: #d4d2d0; padding: 16px 0; border-bottom: 1px solid #8b8886; margin-bottom: 28px; }
+.topbar { width: 100%; background: #e8e6e4; padding: 16px 0; border-bottom: 1px solid #8b8886; margin-bottom: 28px; }
 .topbar-content { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
 .topbar-left { display: flex; align-items: center; gap: 16px; }
 .logo { height: 40px; width: auto; }
-.title { margin: 0; font-size: 32px; letter-spacing: -0.02em; color: #4CAF50; }
+.title { margin: 0; font-size: 32px; letter-spacing: -0.02em; color: #9ACD32; }
 .topbar-nav { display: flex; gap: 12px; align-items: center; }
 .nav-btn { background: transparent; border: 1px solid #333; color: #333; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s ease; font-family: 'Michroma', sans-serif; }
-.nav-btn:hover { background: rgba(76,175,80,0.2); border-color: #4CAF50; color: #4CAF50; }
+.nav-btn:hover { background: rgba(154,205,50,0.2); border-color: #9ACD32; color: #9ACD32; }
 .sub { text-align: center; margin: 16px 0; color: #333; font-size: 14px; }
 .badge { padding: 8px 10px; border: 1px solid #8b8886; border-radius: 999px; color: var(--muted); font-size: 12px; background: rgba(255,255,255,0.03); }
 
@@ -92,7 +92,7 @@ details[data-state="closing"] > *:not(summary) { animation: collapseUp 300ms eas
 .grid > .card { height: 100%; box-sizing: border-box; }
 
 .card { background: #f5f5f0; border: 1px solid #8b8886; border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
-.card h2 { margin: 0 0 12px; font-size: 15px; letter-spacing: 0.02em; color: #4CAF50; text-transform: uppercase; }
+.card h2 { margin: 0 0 12px; font-size: 15px; letter-spacing: 0.02em; color: #9ACD32; text-transform: uppercase; }
 
 .textarea, .input { width: 100%; border: 1px solid #8b8886; background: #f5f5f0; color: #333; border-radius: 12px; padding: 10px 12px; outline: none; box-sizing: border-box; }
 .textarea:focus, .input:focus { border-color: rgba(122,167,255,0.8); box-shadow: 0 0 0 3px rgba(122,167,255,0.18); }
@@ -119,7 +119,7 @@ details[data-state="closing"] > *:not(summary) { animation: collapseUp 300ms eas
 .drop-browse { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .drop-formats { font-family: ui-monospace, monospace; font-size: 10px; color: rgba(154,167,176,0.6); letter-spacing: 0.05em; margin-top: 4px; }
 .drop-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0; padding: 0; border: none; }
-.file-info { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(76,175,80,0.07); border: 1px solid #8b8886; border-radius: 8px; margin-top: -4px; margin-bottom: 12px; font-family: ui-monospace, monospace; font-size: 11px; color: #4CAF50; }
+.file-info { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(154,205,50,0.07); border: 1px solid #8b8886; border-radius: 8px; margin-top: -4px; margin-bottom: 12px; font-family: ui-monospace, monospace; font-size: 11px; color: #9ACD32; }
 .file-info-icon { font-size: 16px; flex-shrink: 0; }
 .file-info-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
 .file-info-meta { color: var(--muted); flex-shrink: 0; }
@@ -130,8 +130,8 @@ details[data-state="closing"] > *:not(summary) { animation: collapseUp 300ms eas
    Live Transcript Mode
    ========================= */
 #textInput.transcript-live { border-color: rgba(168,213,168,0.6); box-shadow: 0 0 0 2px rgba(168,213,168,0.15); background: rgba(168,213,168,0.04); }
-#transcriptModeIndicator { display: none; align-items: center; gap: 6px; font-family: ui-monospace, monospace; font-size: 10px; color: #4CAF50; margin-top: -8px; margin-bottom: 8px; padding: 4px 8px; background: rgba(76,175,80,0.08); border: 1px solid #8b8886; border-radius: 6px; }
-.indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: #4CAF50; animation: pulse-dot 1.5s ease-in-out infinite; flex-shrink: 0; }
+#transcriptModeIndicator { display: none; align-items: center; gap: 6px; font-family: ui-monospace, monospace; font-size: 10px; color: #9ACD32; margin-top: -8px; margin-bottom: 8px; padding: 4px 8px; background: rgba(154,205,50,0.08); border: 1px solid #8b8886; border-radius: 6px; }
+.indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: #9ACD32; animation: pulse-dot 1.5s ease-in-out infinite; flex-shrink: 0; }
 @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
 
 /* =========================
@@ -213,7 +213,7 @@ details[data-state="closing"] > *:not(summary) { animation: collapseUp 300ms eas
    ========================= */
 .auth { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .auth-email { margin-bottom: 0; max-width: 200px; width: auto; }
-.auth-info { display: none; color: #4CAF50; font-size: 12px; padding: 8px 12px; border: 1px solid #8b8886; border-radius: 8px; background: rgba(76,175,80,0.05); font-family: ui-monospace, monospace; }
+.auth-info { display: none; color: #9ACD32; font-size: 12px; padding: 8px 12px; border: 1px solid #8b8886; border-radius: 8px; background: rgba(154,205,50,0.05); font-family: ui-monospace, monospace; }
 #loginBtn { border: 1px solid #8b8886; }
 
 /* =========================
