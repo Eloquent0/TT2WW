@@ -14,7 +14,7 @@ body {
   color: #9ACD32; text-align: center; position: relative;
 }
 .title::before { display: none; }
-.sub { font-family: "Eurostile", Arial, sans-serif; font-weight: 400; color: #333; text-align: center; margin: 6px 0 0; font-size: 14px; }
+.sub { font-family: 'Michroma', sans-serif; font-weight: 400; color: #333; text-align: center; margin: 6px 0 0; font-size: 14px; }
 
 .textarea, .input {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
