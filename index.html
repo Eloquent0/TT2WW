@@ -8,6 +8,20 @@
   <link rel="stylesheet" href="./main.css" />
 </head>
 <body>
+  <header class="topbar">
+    <div class="topbar-content">
+      <div class="topbar-left">
+        <img src="Logo.png" alt="TT2WW Logo" class="logo">
+        <h1 class="title">TT2WW</h1>
+      </div>
+      <nav class="topbar-nav">
+        <button class="nav-btn" id="creditsBtn">Credits</button>
+        <button class="nav-btn" id="aboutBtn">About TT2WW</button>
+        <button class="nav-btn" id="loginBtn">Login</button>
+      </nav>
+    </div>
+  </header>
+
   <div class="app">
 
     <details class="version" id="versionDetails">
@@ -49,21 +63,15 @@
       </div>
     </details>
 
-    <header class="topbar">
-      <div>
-        <h1 class="title">TT2WW</h1>
-        <p class="sub">Designed By Tyler Sakata</p>
-        <p class="sub">Upload audio/video to analyze amplitude and drive typographic size per word.</p>
-      </div>
-      <div class="auth">
-        <span id="authInfo" class="auth-info"></span>
-        <input id="emailInput" class="input auth-email" placeholder="email@example.com" type="email">
-        <button id="loginBtn" class="btn">Login</button>
-        <button id="galleryBtn" class="btn" style="display:none;">🎨 Gallery</button>
-        <button id="logoutBtn" class="btn ghost" style="display:none;">Logout</button>
-      </div>
-      <div class="badge">10:00</div>
-    </header>
+    <p class="sub">Upload audio/video to analyze amplitude and drive typographic size per word.</p>
+
+    <div class="auth" style="display:none;">
+      <span id="authInfo" class="auth-info"></span>
+      <input id="emailInput" class="input auth-email" placeholder="email@example.com" type="email">
+      <button id="galleryBtn" class="btn" style="display:none;">🎨 Gallery</button>
+      <button id="logoutBtn" class="btn ghost" style="display:none;">Logout</button>
+    </div>
+    <div class="badge" style="display:none;">10:00</div>
 
     <section class="grid">
       <div class="card">
