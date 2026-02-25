@@ -5,7 +5,7 @@ let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
 let whisperTimestampBank = null;
-const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run";
+const MODAL_URL = "https://eloquent0--tt2ww-transcriber-fastapi-app.modal.run";
 
 // ---------- Waveform ----------
 function drawWaveform(buffer) {
