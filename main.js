@@ -5,7 +5,7 @@ let audioBuffer = null;
 let audioContext = null;
 let currentAudioFile = null;
 let whisperTimestampBank = null;
-const MODAL_URL = "https://eloquent0--tt2ww-transcriber-fastapi-app.modal.run";
+const MODAL_URL = "https://eloquent0--tt2ww-transcriber-transcribe.modal.run";
 
 // ---------- Waveform ----------
 function drawWaveform(buffer) {
@@ -24,7 +24,6 @@ function drawWaveform(buffer) {
   const W = rect.width;
   const H = rect.height;
 
-  // Downsample to one RMS value per pixel column
   const channelData = buffer.getChannelData(0);
   const samplesPerPx = Math.floor(channelData.length / W);
   const peaks = [];
@@ -37,16 +36,14 @@ function drawWaveform(buffer) {
     peaks.push(Math.sqrt(sum / samplesPerPx));
   }
 
-  // Normalize
   const max = Math.max(...peaks, 0.001);
   const norm = peaks.map(p => p / max);
 
-  // Draw filled waveform (mirrored top+bottom)
   const mid = H / 2;
   const gradient = ctx.createLinearGradient(0, 0, W, 0);
-  gradient.addColorStop(0,   "rgba(100,150,255,0.7)");
-  gradient.addColorStop(0.5, "rgba(160,100,255,0.7)");
-  gradient.addColorStop(1,   "rgba(100,150,255,0.7)");
+  gradient.addColorStop(0,   "rgba(100,150,255,0.5)");
+  gradient.addColorStop(0.5, "rgba(154,205,50,0.6)");
+  gradient.addColorStop(1,   "rgba(100,150,255,0.5)");
 
   ctx.beginPath();
   ctx.moveTo(0, mid);
@@ -60,17 +57,15 @@ function drawWaveform(buffer) {
   ctx.fillStyle = gradient;
   ctx.fill();
 
-  // Thin center line
   ctx.beginPath();
   ctx.moveTo(0, mid);
   ctx.lineTo(W, mid);
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.strokeStyle = "rgba(0,0,0,0.08)";
   ctx.lineWidth = 1;
   ctx.stroke();
 }
 
 function drawPlayhead(position) {
-  // position: 0–1
   const canvas = document.getElementById("waveformPlayhead");
   if (!canvas) return;
 
@@ -91,25 +86,22 @@ function drawPlayhead(position) {
 
   const x = position * W;
 
-  // Filled region left of playhead (progress tint)
-  ctx.fillStyle = "rgba(122,167,255,0.12)";
+  ctx.fillStyle = "rgba(154,205,50,0.15)";
   ctx.fillRect(0, 0, x, H);
 
-  // Playhead line
   ctx.beginPath();
   ctx.moveTo(x, 0);
   ctx.lineTo(x, H);
-  ctx.strokeStyle = "rgba(200,220,255,0.9)";
+  ctx.strokeStyle = "rgba(80,80,80,0.8)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Small top triangle handle
   ctx.beginPath();
   ctx.moveTo(x - 5, 0);
   ctx.lineTo(x + 5, 0);
   ctx.lineTo(x, 7);
   ctx.closePath();
-  ctx.fillStyle = "rgba(200,220,255,0.9)";
+  ctx.fillStyle = "rgba(80,80,80,0.8)";
   ctx.fill();
 }
 
@@ -408,7 +400,6 @@ function clearAll() {
   }
   if (fileInfo) { fileInfo.style.display = "none"; fileInfo.innerHTML = ""; }
 
-  // Clear waveform
   const wc = document.getElementById("waveformCanvas");
   const wp = document.getElementById("waveformPlayhead");
   if (wc) { const ctx = wc.getContext("2d"); ctx.clearRect(0,0,wc.width,wc.height); }
@@ -465,8 +456,8 @@ async function loadAudioFile(file) {
     currentAudioFile = file;
     const duration = audioBuffer.duration;
 
-    if (duration > 900 || duration <= 0) {
-      status.textContent = duration > 900 ? `❌ File too long (max 15 min)` : "❌ Invalid audio duration.";
+    if (duration > 1200 || duration <= 0) {
+      status.textContent = duration > 1200 ? `❌ File too long (max 20 min)` : "❌ Invalid audio duration.";
       audioBuffer = null; currentAudioFile = null; return;
     }
 
@@ -474,8 +465,6 @@ async function loadAudioFile(file) {
     if (durEl) durEl.value = duration.toFixed(2);
 
     showFileInfo(file, duration);
-
-    // Draw waveform after a short delay to let layout settle
     requestAnimationFrame(() => { requestAnimationFrame(() => { drawWaveform(audioBuffer); drawPlayhead(0); }); });
 
     status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
@@ -741,7 +730,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!window.AudioContext && !window.webkitAudioContext) { status.textContent = "❌ Web Audio API not supported."; return; }
   if (window.location.protocol === "file:") { status.textContent = "❌ Must run from a server. Use Live Server in VS Code."; status.classList.remove("flashing"); return; }
 
-  // Redraw waveform on resize
   window.addEventListener("resize", () => { if (audioBuffer) drawWaveform(audioBuffer); });
 
   // ── Drag and drop ──────────────────────────────────────────────────────────
@@ -756,7 +744,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("dragover", (e) => e.preventDefault());
   document.addEventListener("drop", async (e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file && (file.type.startsWith("audio/")||file.type.startsWith("video/"))) await loadAudioFile(file); });
 
-  // Transcript live edit watcher
   document.getElementById("textInput")?.addEventListener("input", () => {
     if (whisperTimestampBank) {
       const editedWords = tokenize(document.getElementById("textInput").value);
@@ -767,7 +754,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Scrub with waveform playhead update
   document.getElementById("scrub")?.addEventListener("input", (e) => {
     const t = Number(e.target.value);
     const duration = audioBuffer?.duration || 1;
@@ -859,7 +845,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window._audioSource = audioSource;
 
     const totalDuration = currentRows[currentRows.length-1].end * 1000;
-    const totalDurationSec = currentRows[currentRows.length-1].end;
     const startTime = performance.now();
     let lastActiveIndex = -1;
 
@@ -868,9 +853,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const elapsed = now - startTime;
 
       if (progressFill) progressFill.style.height = Math.min(100, (elapsed/totalDuration)*100) + "%";
-
-      // Update waveform playhead during animation
-      drawPlayhead(Math.min(1, elapsed / (totalDuration)));
+      drawPlayhead(Math.min(1, elapsed / totalDuration));
 
       let activeIndex = -1;
       for (let i = currentRows.length-1; i >= 0; i--) {
@@ -902,6 +885,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
+      // Brute force opacity enforcement
       if (followMode && activeIndex >= 0) {
         words.forEach((w, j) => {
           const op = parseFloat(w.style.opacity);
