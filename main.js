@@ -41,9 +41,9 @@ function drawWaveform(buffer) {
 
   const mid = H / 2;
   const gradient = ctx.createLinearGradient(0, 0, W, 0);
-  gradient.addColorStop(0,   "rgba(100,150,255,0.5)");
-  gradient.addColorStop(0.5, "rgba(154,205,50,0.6)");
-  gradient.addColorStop(1,   "rgba(100,150,255,0.5)");
+  gradient.addColorStop(0,   "rgba(100,150,255,0.7)");
+  gradient.addColorStop(0.5, "rgba(160,100,255,0.7)");
+  gradient.addColorStop(1,   "rgba(100,150,255,0.7)");
 
   ctx.beginPath();
   ctx.moveTo(0, mid);
