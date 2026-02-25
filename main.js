@@ -465,8 +465,8 @@ async function loadAudioFile(file) {
     currentAudioFile = file;
     const duration = audioBuffer.duration;
 
-    if (duration > 900 || duration < 15) {
-      status.textContent = duration > 900 ? `❌ File too long (max 15 min)` : "❌ Audio must be at least 15 seconds.";
+    if (duration > 900 || duration <= 0) {
+      status.textContent = duration > 900 ? `❌ File too long (max 15 min)` : "❌ Invalid audio duration.";
       audioBuffer = null; currentAudioFile = null; return;
     }
 
@@ -543,7 +543,7 @@ async function runMachine() {
     if (!audioBuffer) { status.textContent = "❌ Please upload an audio file first."; return; }
     if (!(maxDb > minDb)) { status.textContent = "❌ Max dB must be greater than Min dB."; return; }
     const durationSec = audioBuffer.duration;
-    if (!Number.isFinite(durationSec) || durationSec < 15) { status.textContent = "❌ Audio must be at least 15 seconds."; return; }
+    if (!Number.isFinite(durationSec) || durationSec <= 0) { status.textContent = "❌ Invalid audio duration."; return; }
     const text = document.getElementById("textInput").value;
     if (!text.trim() && !window._whisperWords) { status.textContent = "❌ Please enter text or transcribe first."; return; }
     status.textContent = "🎵 Measuring dB from audio...";
