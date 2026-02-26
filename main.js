@@ -456,8 +456,8 @@ async function loadAudioFile(file) {
     currentAudioFile = file;
     const duration = audioBuffer.duration;
 
-    if (duration > 1200 || duration <= 0) {
-      status.textContent = duration > 1200 ? `❌ File too long (max 20 min)` : "❌ Invalid audio duration.";
+    if (duration > 600 || duration <= 0) {
+      status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
       audioBuffer = null; currentAudioFile = null; return;
     }
 
