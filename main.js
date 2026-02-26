@@ -480,39 +480,57 @@ async function loadAudioFile(file) {
       document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
 
       transcribeBtn.addEventListener("click", async () => {
-        if (!currentAudioFile) return;
-        status.textContent = "🎤 Transcribing… this may take a few minutes for longer songs.";
-        transcribeBtn.disabled = true; transcribeBtn.textContent = "🎤 Transcribing…";
-        try {
-          const formData = new FormData();
-          formData.append("file", currentAudioFile);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 300000);
-          let res;
-          try {
-            res = await fetch(MODAL_URL, { method: "POST", body: formData, signal: controller.signal });
-            clearTimeout(timeoutId);
-          } catch (err) {
-            clearTimeout(timeoutId);
-            if (err.name === "AbortError") throw new Error("Timed out after 5 minutes.");
-            throw err;
-          }
-          if (!res.ok) throw new Error(`Server error: ${res.status}`);
-          const json = await res.json();
-          const words = json.words;
-          if (!words || !words.length) throw new Error("No words returned.");
-          window._whisperWords = words;
-          whisperTimestampBank = words;
-          const transcript = words.map(w => w.word).join(" ");
-          document.getElementById("textInput").value = transcript;
-          setTranscriptMode(true);
-          status.textContent = `✅ Transcribed ${words.length} words. Edit transcript then click Generate.`;
-        } catch (err) {
-          status.textContent = `❌ Transcription failed: ${err.message}`;
-        } finally {
-          transcribeBtn.disabled = false; transcribeBtn.textContent = "🎤 Transcribe";
-        }
-      });
+  if (!currentAudioFile) return;
+  status.textContent = "⏳ Warming up transcription server...";
+  transcribeBtn.disabled = true;
+  transcribeBtn.textContent = "🎤 Transcribing…";
+
+  try {
+    // Poll health until ready
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      try {
+        const h = await fetch(MODAL_URL.replace(/\/$/, "") + "/health");
+        if (h.ok) { ready = true; break; }
+      } catch (e) {}
+      status.textContent = `⏳ Warming up server... (${i + 1}/30)`;
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    if (!ready) throw new Error("Server did not warm up in time.");
+
+    status.textContent = "🎤 Transcribing… this may take a few minutes.";
+
+    const formData = new FormData();
+    formData.append("file", currentAudioFile);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000);
+    let res;
+    try {
+      res = await fetch(MODAL_URL, { method: "POST", body: formData, signal: controller.signal });
+      clearTimeout(timeoutId);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") throw new Error("Timed out after 10 minutes.");
+      throw err;
+    }
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const json = await res.json();
+    const words = json.words;
+    if (!words || !words.length) throw new Error("No words returned.");
+    window._whisperWords = words;
+    whisperTimestampBank = words;
+    const transcript = words.map(w => w.word).join(" ");
+    document.getElementById("textInput").value = transcript;
+    setTranscriptMode(true);
+    status.textContent = `✅ Transcribed ${words.length} words. Edit transcript then click Generate.`;
+  } catch (err) {
+    status.textContent = `❌ Transcription failed: ${err.message}`;
+  } finally {
+    transcribeBtn.disabled = false;
+    transcribeBtn.textContent = "🎤 Transcribe";
+  }
+});
     }
   } catch (err) {
     status.textContent = `❌ ${err.message || "Could not decode audio."}`;
