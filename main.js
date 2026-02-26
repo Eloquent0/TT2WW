@@ -481,40 +481,44 @@ async function loadAudioFile(file) {
 
       transcribeBtn.addEventListener("click", async () => {
   if (!currentAudioFile) return;
-  status.textContent = "⏳ Warming up transcription server...";
+  status.textContent = "🎤 Transcribing… warming up server, please wait.";
   transcribeBtn.disabled = true;
   transcribeBtn.textContent = "🎤 Transcribing…";
 
   try {
-    // Poll health until ready
-    let ready = false;
-    for (let i = 0; i < 30; i++) {
-      try {
-        const h = await fetch(MODAL_URL.replace(/\/$/, "") + "/health");
-        if (h.ok) { ready = true; break; }
-      } catch (e) {}
-      status.textContent = `⏳ Warming up server... (${i + 1}/30)`;
-      await new Promise(r => setTimeout(r, 5000));
-    }
-
-    if (!ready) throw new Error("Server did not warm up in time.");
-
-    status.textContent = "🎤 Transcribing… this may take a few minutes.";
-
-    const formData = new FormData();
-    formData.append("file", currentAudioFile);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600000);
     let res;
-    try {
-      res = await fetch(MODAL_URL, { method: "POST", body: formData, signal: controller.signal });
-      clearTimeout(timeoutId);
-    } catch (err) {
-      clearTimeout(timeoutId);
-      if (err.name === "AbortError") throw new Error("Timed out after 10 minutes.");
-      throw err;
+    // Retry up to 10 times to handle cold start 303s
+    for (let attempt = 1; attempt <= 10; attempt++) {
+      status.textContent = `🎤 Transcribing… attempt ${attempt}/10 (cold start can take ~2 min)`;
+      const formData = new FormData();
+      formData.append("file", currentAudioFile);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000);
+      try {
+        res = await fetch(MODAL_URL, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+          redirect: "error"  // don't follow 303 redirects, treat as error
+        });
+        clearTimeout(timeoutId);
+        if (res.ok) break; // success, exit retry loop
+        if (res.status !== 303) throw new Error(`Server error: ${res.status}`);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === "AbortError") throw new Error("Timed out after 10 minutes.");
+        // 303 or network error — wait and retry
+        if (attempt < 10) {
+          status.textContent = `⏳ Server warming up, retrying in 15s... (${attempt}/10)`;
+          await new Promise(r => setTimeout(r, 15000));
+          continue;
+        }
+        throw new Error("Server failed to start after 10 attempts.");
+      }
     }
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+    if (!res || !res.ok) throw new Error("Server did not become ready.");
+
     const json = await res.json();
     const words = json.words;
     if (!words || !words.length) throw new Error("No words returned.");
