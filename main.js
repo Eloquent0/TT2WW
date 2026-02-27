@@ -184,6 +184,36 @@ function buildDbTimeline(durationSec, minDb, maxDb) {
   return samples;
 }
 
+function suggestVariationDbRange(durationSec) {
+  const step = 0.05;
+  const rawDb = [];
+  for (let t = 0; t <= durationSec + 1e-9; t += step) {
+    const amp = getAudioAmplitudeAtTime(t);
+    const db = amplitudeToDb(amp);
+    if (Number.isFinite(db)) rawDb.push(db);
+  }
+  if (rawDb.length < 8) return null;
+
+  rawDb.sort((a, b) => a - b);
+  const q = (p) => {
+    const idx = Math.max(0, Math.min(rawDb.length - 1, Math.floor((rawDb.length - 1) * p)));
+    return rawDb[idx];
+  };
+
+  let minDb = Math.floor(q(0.10));
+  let maxDb = Math.ceil(q(0.90));
+
+  if (maxDb - minDb < 12) {
+    const center = (minDb + maxDb) / 2;
+    minDb = Math.floor(center - 6);
+    maxDb = Math.ceil(center + 6);
+  }
+
+  minDb = clamp(minDb, -80, -1);
+  maxDb = clamp(maxDb, minDb + 1, 0);
+  return { minDb, maxDb };
+}
+
 function makeTimestamps(words, durationSec) {
   const n = words.length;
   if (n === 0) return [];
@@ -803,6 +833,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("generateBtn")?.addEventListener("click", runMachine);
+  document.getElementById("autoDbBtn")?.addEventListener("click", () => {
+    if (!audioBuffer) { status.textContent = "❌ Upload an audio/video file first to auto-adjust dB."; return; }
+    const durationSec = audioBuffer.duration;
+    if (!Number.isFinite(durationSec) || durationSec <= 0) { status.textContent = "❌ Invalid audio duration."; return; }
+    const suggested = suggestVariationDbRange(durationSec);
+    if (!suggested) { status.textContent = "❌ Could not detect enough audio data for auto-adjust."; return; }
+    const minEl = document.getElementById("minDb");
+    const maxEl = document.getElementById("maxDb");
+    if (minEl) minEl.value = String(suggested.minDb);
+    if (maxEl) maxEl.value = String(suggested.maxDb);
+    status.textContent = `🎛 Auto-set dB range to ${suggested.minDb} to ${suggested.maxDb} for stronger text variation. Click Generate.`;
+  });
   document.getElementById("downloadCsvBtn")?.addEventListener("click", () => {
     const minDb = Number(document.getElementById("minDb").value);
     const maxDb = Number(document.getElementById("maxDb").value);
