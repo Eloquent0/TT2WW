@@ -288,7 +288,7 @@ function renderWords(rows, minDb, maxDb, mode = "neutral") {
     span.style.fontSize = `${size}px`;
     span.style.lineHeight = "1.05";
     span.style.color = color;
-    span.style.marginRight = `${clamp(Math.round(size*0.18),6,48)}px`;
+    span.style.marginRight = `${clamp(Math.round(size * 0.35), 10, 72)}px`;
     span.setAttribute('data-word', r.word);
     span.setAttribute('data-index', index+1);
     span.setAttribute('data-start', r.start.toFixed(2));
@@ -757,7 +757,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Drag and drop ──────────────────────────────────────────────────────────
   const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("wavFileInput");
-  dropZone?.addEventListener("click", () => fileInput.click());
+  dropZone?.addEventListener("click", (e) => {
+  if (e.target === fileInput) return; // already handled natively
+  fileInput.click();
+});
   fileInput?.addEventListener("change", async (e) => { const file = e.target.files?.[0]; if (file) await loadAudioFile(file); });
   dropZone?.addEventListener("dragenter", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
   dropZone?.addEventListener("dragover",  (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
