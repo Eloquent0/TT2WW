@@ -11,52 +11,39 @@ const MODAL_URL = "https://eloquent0--tt2ww-transcriber-fastapi-app.modal.run";
 function drawWaveform(buffer) {
   const canvas = document.getElementById("waveformCanvas");
   if (!canvas || !buffer) return;
-
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.parentElement.getBoundingClientRect();
   canvas.width  = rect.width  * dpr;
   canvas.height = rect.height * dpr;
   canvas.style.width  = rect.width  + "px";
   canvas.style.height = rect.height + "px";
-
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
   const W = rect.width;
   const H = rect.height;
-
   const channelData = buffer.getChannelData(0);
   const samplesPerPx = Math.floor(channelData.length / W);
   const peaks = [];
   for (let x = 0; x < W; x++) {
     const start = x * samplesPerPx;
     let sum = 0;
-    for (let i = 0; i < samplesPerPx; i++) {
-      sum += channelData[start + i] ** 2;
-    }
+    for (let i = 0; i < samplesPerPx; i++) { sum += channelData[start + i] ** 2; }
     peaks.push(Math.sqrt(sum / samplesPerPx));
   }
-
   const max = Math.max(...peaks, 0.001);
   const norm = peaks.map(p => p / max);
-
   const mid = H / 2;
   const gradient = ctx.createLinearGradient(0, 0, W, 0);
   gradient.addColorStop(0,   "rgba(100,150,255,0.7)");
   gradient.addColorStop(0.5, "rgba(160,100,255,0.7)");
   gradient.addColorStop(1,   "rgba(100,150,255,0.7)");
-
   ctx.beginPath();
   ctx.moveTo(0, mid);
-  for (let x = 0; x < W; x++) {
-    ctx.lineTo(x, mid - norm[x] * mid * 0.9);
-  }
-  for (let x = W - 1; x >= 0; x--) {
-    ctx.lineTo(x, mid + norm[x] * mid * 0.9);
-  }
+  for (let x = 0; x < W; x++) { ctx.lineTo(x, mid - norm[x] * mid * 0.9); }
+  for (let x = W - 1; x >= 0; x--) { ctx.lineTo(x, mid + norm[x] * mid * 0.9); }
   ctx.closePath();
   ctx.fillStyle = gradient;
   ctx.fill();
-
   ctx.beginPath();
   ctx.moveTo(0, mid);
   ctx.lineTo(W, mid);
@@ -68,34 +55,27 @@ function drawWaveform(buffer) {
 function drawPlayhead(position) {
   const canvas = document.getElementById("waveformPlayhead");
   if (!canvas) return;
-
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.parentElement.getBoundingClientRect();
   canvas.width  = rect.width  * dpr;
   canvas.height = rect.height * dpr;
   canvas.style.width  = rect.width  + "px";
   canvas.style.height = rect.height + "px";
-
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
   const W = rect.width;
   const H = rect.height;
-
   ctx.clearRect(0, 0, W, H);
   if (position <= 0) return;
-
   const x = position * W;
-
   ctx.fillStyle = "rgba(154,205,50,0.15)";
   ctx.fillRect(0, 0, x, H);
-
   ctx.beginPath();
   ctx.moveTo(x, 0);
   ctx.lineTo(x, H);
   ctx.strokeStyle = "rgba(80,80,80,0.8)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
-
   ctx.beginPath();
   ctx.moveTo(x - 5, 0);
   ctx.lineTo(x + 5, 0);
@@ -193,22 +173,18 @@ function suggestVariationDbRange(durationSec) {
     if (Number.isFinite(db)) rawDb.push(db);
   }
   if (rawDb.length < 8) return null;
-
   rawDb.sort((a, b) => a - b);
   const q = (p) => {
     const idx = Math.max(0, Math.min(rawDb.length - 1, Math.floor((rawDb.length - 1) * p)));
     return rawDb[idx];
   };
-
   let minDb = Math.floor(q(0.10));
   let maxDb = Math.ceil(q(0.90));
-
   if (maxDb - minDb < 12) {
     const center = (minDb + maxDb) / 2;
     minDb = Math.floor(center - 6);
     maxDb = Math.ceil(center + 6);
   }
-
   minDb = clamp(minDb, -80, -1);
   maxDb = clamp(maxDb, minDb + 1, 0);
   return { minDb, maxDb };
@@ -307,7 +283,7 @@ function setTranscriptMode(active) {
 }
 
 function isLeadingPunctuation(word) {
-  return /^[\]\)\}\"'”’.,;:!?%]+/.test(word || "");
+  return /^[\]\)\}\"'"'.,;:!?%]+/.test(word || "");
 }
 
 function renderWords(rows, minDb, maxDb, mode = "neutral") {
@@ -418,14 +394,12 @@ function clearAll() {
   if (window._audioSource) { try { window._audioSource.stop(); } catch(e) {} window._audioSource = null; }
   currentRows = []; dbTimeline = []; audioBuffer = null; audioContext = null;
   currentAudioFile = null; window._whisperWords = null; whisperTimestampBank = null;
-
   document.getElementById("wordOutput").innerHTML = "";
   document.getElementById("textInput").value = "";
   document.getElementById("wavFileInput").value = "";
   document.getElementById("durationSec").value = "0";
   document.querySelector("#metaTable tbody").innerHTML = "";
   setTranscriptMode(false);
-
   const dropZone = document.getElementById("dropZone");
   const fileInfo = document.getElementById("fileInfo");
   if (dropZone) {
@@ -436,27 +410,22 @@ function clearAll() {
     if (dropSub) dropSub.innerHTML = 'or <span class="drop-browse">browse files</span>';
   }
   if (fileInfo) { fileInfo.style.display = "none"; fileInfo.innerHTML = ""; }
-
   const wc = document.getElementById("waveformCanvas");
   const wp = document.getElementById("waveformPlayhead");
   if (wc) { const ctx = wc.getContext("2d"); ctx.clearRect(0,0,wc.width,wc.height); }
   if (wp) { const ctx = wp.getContext("2d"); ctx.clearRect(0,0,wp.width,wp.height); }
-
   const progressFill = document.getElementById("progressBarFill");
   if (progressFill) progressFill.style.height = "0%";
   const scrub = document.getElementById("scrub");
   if (scrub) scrub.value = "0";
   document.getElementById("scrubTime").textContent = "0.00s";
   document.getElementById("scrubDb").textContent = "— dB";
-
   const playBtn = document.getElementById("playAnimationBtn");
   const resetBtn = document.getElementById("resetAnimationBtn");
   if (playBtn) { playBtn.disabled = true; playBtn.textContent = "▶ Play"; }
   if (resetBtn) resetBtn.disabled = true;
-
   const transcribeBtn = document.getElementById("transcribeBtn");
   if (transcribeBtn) transcribeBtn.remove();
-
   document.getElementById("status").textContent = "Upload a file to begin.";
 }
 
@@ -466,17 +435,14 @@ async function loadAudioFile(file) {
   try {
     if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
     if (audioContext.state === "suspended") await audioContext.resume();
-
     const { createFFmpeg, fetchFile } = FFmpeg;
     const ffmpeg = createFFmpeg({ log: false });
     const arrayBuffer = await file.arrayBuffer();
     let finalBuffer = arrayBuffer;
-
     const canDecode = await new Promise(resolve => {
       const testCtx = new (window.AudioContext || window.webkitAudioContext)();
       testCtx.decodeAudioData(arrayBuffer.slice(0), () => resolve(true), () => resolve(false));
     });
-
     if (!canDecode) {
       status.textContent = "⏳ Converting audio format...";
       if (!ffmpeg.isLoaded()) await ffmpeg.load();
@@ -485,25 +451,19 @@ async function loadAudioFile(file) {
       const data = ffmpeg.FS('readFile', 'output.wav');
       finalBuffer = data.buffer;
     }
-
     audioBuffer = await new Promise((resolve, reject) => {
       audioContext.decodeAudioData(finalBuffer, resolve, reject);
     });
-
     currentAudioFile = file;
     const duration = audioBuffer.duration;
-
     if (duration > 600 || duration <= 0) {
       status.textContent = duration > 600 ? `❌ File too long (max 10 min)` : "❌ Invalid audio duration.";
       audioBuffer = null; currentAudioFile = null; return;
     }
-
     const durEl = document.getElementById("durationSec");
     if (durEl) durEl.value = duration.toFixed(2);
-
     showFileInfo(file, duration);
     requestAnimationFrame(() => { requestAnimationFrame(() => { drawWaveform(audioBuffer); drawPlayhead(0); }); });
-
     status.textContent = `✅ Loaded: ${file.name} (${duration.toFixed(2)}s). Click Generate or Transcribe.`;
     status.classList.remove("flashing");
 
@@ -517,61 +477,62 @@ async function loadAudioFile(file) {
       document.getElementById("generateBtn").insertAdjacentElement("afterend", transcribeBtn);
 
       transcribeBtn.addEventListener("click", async () => {
-  if (!currentAudioFile) return;
-  status.textContent = "🎤 Transcribing… warming up server, please wait.";
-  transcribeBtn.disabled = true;
-  transcribeBtn.textContent = "🎤 Transcribing…";
-
-  try {
-    let res;
-    // Retry up to 10 times to handle cold start 303s
-    for (let attempt = 1; attempt <= 10; attempt++) {
-      status.textContent = `🎤 Transcribing… attempt ${attempt}/10 (cold start can take ~2 min)`;
-      const formData = new FormData();
-      formData.append("file", currentAudioFile);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000);
-      try {
-        res = await fetch(MODAL_URL, {
-          method: "POST",
-          body: formData,
-          signal: controller.signal,
-          redirect: "follow"
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) break; // success, exit retry loop
-        if (res.status !== 303) throw new Error(`Server error: ${res.status}`);
-      } catch (err) {
-        clearTimeout(timeoutId);
-        if (err.name === "AbortError") throw new Error("Timed out after 10 minutes.");
-        // 303 or network error — wait and retry
-        if (attempt < 10) {
-          status.textContent = `⏳ Server warming up, retrying in 15s... (${attempt}/10)`;
-          await new Promise(r => setTimeout(r, 15000));
-          continue;
+        if (!currentAudioFile) return;
+        status.textContent = "🎤 Transcribing… warming up server, please wait.";
+        transcribeBtn.disabled = true;
+        transcribeBtn.textContent = "🎤 Transcribing…";
+        try {
+          let res;
+          for (let attempt = 1; attempt <= 10; attempt++) {
+            status.textContent = `🎤 Transcribing… attempt ${attempt}/10`;
+            const formData = new FormData();
+            formData.append("file", currentAudioFile);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 600000);
+            try {
+              res = await fetch(MODAL_URL + "/", {
+                method: "POST",
+                body: formData,
+                signal: controller.signal,
+              });
+              clearTimeout(timeoutId);
+              if (res.ok) break;
+              if (res.status === 303 || res.status === 502 || res.status === 503) {
+                if (attempt < 10) {
+                  status.textContent = `⏳ Server warming up, retrying in 10s... (${attempt}/10)`;
+                  await new Promise(r => setTimeout(r, 10000));
+                  continue;
+                }
+              }
+              throw new Error(`Server error: ${res.status}`);
+            } catch (err) {
+              clearTimeout(timeoutId);
+              if (err.name === "AbortError") throw new Error("Timed out after 10 minutes.");
+              if (attempt < 10) {
+                status.textContent = `⏳ Retrying in 10s... (${attempt}/10)`;
+                await new Promise(r => setTimeout(r, 10000));
+                continue;
+              }
+              throw err;
+            }
+          }
+          if (!res || !res.ok) throw new Error("Server did not become ready.");
+          const json = await res.json();
+          const words = json.words;
+          if (!words || !words.length) throw new Error("No words returned.");
+          window._whisperWords = words;
+          whisperTimestampBank = words;
+          const transcript = words.map(w => w.word).join(" ");
+          document.getElementById("textInput").value = transcript;
+          setTranscriptMode(true);
+          status.textContent = `✅ Transcribed ${words.length} words. Edit transcript then click Generate.`;
+        } catch (err) {
+          status.textContent = `❌ Transcription failed: ${err.message}`;
+        } finally {
+          transcribeBtn.disabled = false;
+          transcribeBtn.textContent = "🎤 Transcribe";
         }
-        throw new Error("Server failed to start after 10 attempts.");
-      }
-    }
-
-    if (!res || !res.ok) throw new Error("Server did not become ready.");
-
-    const json = await res.json();
-    const words = json.words;
-    if (!words || !words.length) throw new Error("No words returned.");
-    window._whisperWords = words;
-    whisperTimestampBank = words;
-    const transcript = words.map(w => w.word).join(" ");
-    document.getElementById("textInput").value = transcript;
-    setTranscriptMode(true);
-    status.textContent = `✅ Transcribed ${words.length} words. Edit transcript then click Generate.`;
-  } catch (err) {
-    status.textContent = `❌ Transcription failed: ${err.message}`;
-  } finally {
-    transcribeBtn.disabled = false;
-    transcribeBtn.textContent = "🎤 Transcribe";
-  }
-});
+      });
     }
   } catch (err) {
     status.textContent = `❌ ${err.message || "Could not decode audio."}`;
@@ -745,12 +706,8 @@ async function maybeLoadShared() {
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
-  document.getElementById("creditsBtn")?.addEventListener("click", () => {
-    window.location.href = "./credits.html";
-  });
-  document.getElementById("aboutBtn")?.addEventListener("click", () => {
-    window.location.href = "./about.html";
-  });
+  document.getElementById("creditsBtn")?.addEventListener("click", () => { window.location.href = "./credits.html"; });
+  document.getElementById("aboutBtn")?.addEventListener("click", () => { window.location.href = "./about.html"; });
 
   const versionDetails = document.getElementById("versionDetails");
   let animationTimer = null;
@@ -801,16 +758,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Drag and drop ──────────────────────────────────────────────────────────
   const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("wavFileInput");
+
   let fileDialogOpen = false;
-dropZone?.addEventListener("click", (e) => {
-  if (e.target === fileInput) return;
-  if (fileDialogOpen) return;
-  fileDialogOpen = true;
-  fileInput.click();
-  window.addEventListener("focus", () => {
-    setTimeout(() => { fileDialogOpen = false; }, 500);
-  }, { once: true });
-});
+  dropZone?.addEventListener("click", (e) => {
+    if (e.target === fileInput) return;
+    if (fileDialogOpen) return;
+    fileDialogOpen = true;
+    fileInput.click();
+    window.addEventListener("focus", () => {
+      setTimeout(() => { fileDialogOpen = false; }, 500);
+    }, { once: true });
+  });
+
   fileInput?.addEventListener("change", async (e) => { const file = e.target.files?.[0]; if (file) await loadAudioFile(file); });
   dropZone?.addEventListener("dragenter", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
   dropZone?.addEventListener("dragover",  (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
@@ -919,7 +878,6 @@ dropZone?.addEventListener("click", (e) => {
       scrollTimeout = setTimeout(() => { followMode = true; }, 2000);
     }
     wordOutput.addEventListener("scroll", onUserScroll);
-
     words.forEach(w => { w.style.transition = "none"; w.style.opacity = "0"; w.classList.remove("faded","active"); });
 
     let audioSource = null;
@@ -938,15 +896,12 @@ dropZone?.addEventListener("click", (e) => {
     function tick(now) {
       if (!animRunning) return;
       const elapsed = now - startTime;
-
       if (progressFill) progressFill.style.height = Math.min(100, (elapsed/totalDuration)*100) + "%";
       drawPlayhead(Math.min(1, elapsed / totalDuration));
-
       let activeIndex = -1;
       for (let i = currentRows.length-1; i >= 0; i--) {
         if (elapsed >= currentRows[i].start*1000) { activeIndex = i; break; }
       }
-
       if (activeIndex !== lastActiveIndex) {
         lastActiveIndex = activeIndex;
         if (activeIndex >= 0) {
@@ -971,8 +926,6 @@ dropZone?.addEventListener("click", (e) => {
           }
         }
       }
-
-      // Brute force opacity enforcement
       if (followMode && activeIndex >= 0) {
         words.forEach((w, j) => {
           const op = parseFloat(w.style.opacity);
@@ -980,7 +933,6 @@ dropZone?.addEventListener("click", (e) => {
           else if (j > activeIndex && op > 0) { w.style.opacity = "0"; }
         });
       }
-
       if (elapsed >= totalDuration + 500) {
         animRunning = false;
         wordOutput.removeEventListener("scroll", onUserScroll);
@@ -991,7 +943,6 @@ dropZone?.addEventListener("click", (e) => {
         if (resetBtn) resetBtn.disabled = false;
         return;
       }
-
       const rafId = requestAnimationFrame(tick);
       activeTimeouts.push(rafId);
     }
