@@ -276,19 +276,26 @@ function setTranscriptMode(active) {
   else { textarea.classList.remove("transcript-live"); if (indicator) indicator.style.display = "none"; }
 }
 
+function isLeadingPunctuation(word) {
+  return /^[\]\)\}\"'”’.,;:!?%]+/.test(word || "");
+}
+
 function renderWords(rows, minDb, maxDb, mode = "neutral") {
   const container = document.getElementById("wordOutput");
   container.innerHTML = "";
   rows.forEach((r, index) => {
     const size = mapDbToSize(r.db, minDb, maxDb, mode);
     const color = dbToColor(r.db, minDb, maxDb);
+    if (index > 0 && !isLeadingPunctuation(r.word)) {
+      container.appendChild(document.createTextNode(" "));
+    }
     const span = document.createElement("span");
     span.className = "word";
     span.textContent = r.word;
     span.style.fontSize = `${size}px`;
     span.style.lineHeight = "1.05";
     span.style.color = color;
-    span.style.marginRight = `${clamp(Math.round(size * 0.35), 10, 72)}px`;
+    span.style.marginRight = "0";
     span.setAttribute('data-word', r.word);
     span.setAttribute('data-index', index+1);
     span.setAttribute('data-start', r.start.toFixed(2));
