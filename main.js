@@ -536,7 +536,7 @@ async function loadAudioFile(file) {
           method: "POST",
           body: formData,
           signal: controller.signal,
-          redirect: "error"  // don't follow 303 redirects, treat as error
+          redirect: "follow"
         });
         clearTimeout(timeoutId);
         if (res.ok) break; // success, exit retry loop
@@ -801,9 +801,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── Drag and drop ──────────────────────────────────────────────────────────
   const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("wavFileInput");
-  dropZone?.addEventListener("click", (e) => {
-  if (e.target === fileInput) return; // already handled natively
+  let fileDialogOpen = false;
+dropZone?.addEventListener("click", (e) => {
+  if (e.target === fileInput) return;
+  if (fileDialogOpen) return;
+  fileDialogOpen = true;
   fileInput.click();
+  window.addEventListener("focus", () => {
+    setTimeout(() => { fileDialogOpen = false; }, 500);
+  }, { once: true });
 });
   fileInput?.addEventListener("change", async (e) => { const file = e.target.files?.[0]; if (file) await loadAudioFile(file); });
   dropZone?.addEventListener("dragenter", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
