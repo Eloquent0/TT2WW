@@ -715,6 +715,13 @@ async function maybeLoadShared() {
 document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
+  document.getElementById("creditsBtn")?.addEventListener("click", () => {
+    window.location.href = "./credits.html";
+  });
+  document.getElementById("aboutBtn")?.addEventListener("click", () => {
+    window.location.href = "./about.html";
+  });
+
   const versionDetails = document.getElementById("versionDetails");
   let animationTimer = null;
   if (versionDetails) {

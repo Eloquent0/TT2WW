@@ -1,0 +1,54 @@
+.page-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+}
+
+.page-intro {
+  margin: 0 0 18px;
+  color: #6b6866;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.page-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.page-card h3 {
+  margin: 0 0 8px;
+  color: #9ACD32;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.page-card p,
+.page-card li {
+  color: #333;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.page-card ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.topbar-nav .nav-btn {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.topbar-nav .nav-btn.active {
+  background: rgba(154,205,50,0.2);
+  border-color: #9ACD32;
+  color: #9ACD32;
+}
