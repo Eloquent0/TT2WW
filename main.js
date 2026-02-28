@@ -6,6 +6,8 @@ let audioContext = null;
 let currentAudioFile = null;
 let whisperTimestampBank = null;
 const MODAL_URL = "https://eloquent0--tt2ww-transcriber-fastapi-app.modal.run";
+// Silently pre-warm the server in background
+fetch(MODAL_URL + "/health").catch(() => {});
 
 // ---------- Waveform ----------
 function drawWaveform(buffer) {
