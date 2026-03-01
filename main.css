@@ -10,7 +10,7 @@ body {
 .title {
   margin: 0; font-size: 64px; font-weight: 700;
   font-family: 'Michroma', sans-serif; font-style: italic;
-  letter-spacing: -.25em; text-transform: uppercase;
+  letter-spacing: -.10em; text-transform: uppercase;
   color: #9ACD32; text-align: center; position: relative;
 }
 .title::before { display: none; }
@@ -80,7 +80,7 @@ details[data-state="closing"] > *:not(summary) { animation: collapseUp 300ms eas
 .topbar-content { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
 .topbar-left { display: flex; align-items: center; gap: 16px; }
 .logo { height: 40px; width: auto; }
-.title { margin: 0; font-size: 32px; letter-spacing: -0.02em; color: #9ACD32; }
+.title { margin: 0; font-size: 32px; letter-spacing: -0.10em; color: #9ACD32; }
 .topbar-nav { display: flex; gap: 12px; align-items: center; }
 .nav-btn { background: transparent; border: 1px solid #333; color: #333; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s ease; font-family: 'Michroma', sans-serif; }
 .nav-btn:hover { background: rgba(154,205,50,0.2); border-color: #9ACD32; color: #9ACD32; }
