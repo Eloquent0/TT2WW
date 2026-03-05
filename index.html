@@ -216,5 +216,13 @@
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.11.6/ffmpeg.min.js"></script>
   <script src="./main.js"></script>
+  <script language="JavaScript" type="text/javascript">
+    (function titleScroller(text) {
+      document.title = text;
+      setTimeout(function () {
+        titleScroller(text.substr(1) + text.substr(0, 1));
+      }, 500);
+    })("TT2WW—Audio to typographic composition — ");
+  </script>
 </body>
 </html>
